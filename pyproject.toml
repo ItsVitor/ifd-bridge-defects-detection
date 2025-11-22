@@ -1,0 +1,15 @@
+[project]
+name = "ifd-bridge-defects-detection"
+version = "0.1.0"
+description = "Detecção inteligente de falhas em pontes"
+readme = "README.md"
+requires-python = ">=3.13, <3.14"
+dependencies = [
+    "h5py>=3.15.1",
+    "mat73>=0.65",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+    "pyarrow>=22.0.0",
+    "scipy>=1.16.3",
+    "tqdm>=4.67.1",
+]
