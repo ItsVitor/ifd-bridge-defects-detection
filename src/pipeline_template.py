@@ -6,6 +6,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import stats
+from scipy.signal import welch
 from sklearn.preprocessing import StandardScaler
 
 
@@ -87,7 +89,6 @@ class BridgeDefectPipeline(ABC):
         
         return pd.concat(dfs, ignore_index=True)
 
-    @abstractmethod
     def extract_features(self, raw_data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Extract time and frequency domain features from raw data.
         
@@ -98,7 +99,83 @@ class BridgeDefectPipeline(ABC):
             tuple[np.ndarray, np.ndarray, np.ndarray]: Feature matrix X,
                 labels y, and group IDs.
         """
-        pass
+        samples = raw_data.groupby(["ExperimentID", "NodeID"])
+        feature_list = []
+        labels = []
+        groups = []
+        
+        for (exp_id, node_id), group in samples:
+            features = []
+            for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
+                signal = group[axis].values
+                features.extend(self._extract_time_features(signal))
+                features.extend(self._extract_freq_features(signal))
+            
+            feature_list.append(features)
+            labels.append(group["Class"].iloc[0])
+            groups.append(self._compute_group_id(group))
+        
+        return np.array(feature_list), np.array(labels), np.array(groups)
+
+    def _extract_time_features(self, signal: np.ndarray) -> list[float]:
+        """Extract time-domain features from signal.
+        
+        Args:
+            signal (np.ndarray): 1D acceleration signal.
+            
+        Returns:
+            list[float]: 10 time-domain features.
+        """
+        mean = np.mean(signal)
+        variance = np.var(signal)
+        kurtosis = stats.kurtosis(signal)
+        rms = np.sqrt(np.mean(signal**2))
+        peak = np.max(np.abs(signal))
+        peak_to_rms = peak / rms if rms > 0 else 0
+        rss = np.sqrt(np.sum(signal**2))
+        peak_to_peak = np.ptp(signal)
+        minimum = np.min(signal)
+        maximum = np.max(signal)
+        jerk = np.mean(np.abs(np.diff(signal)))
+        
+        return [mean, variance, kurtosis, rms, peak_to_rms, rss, 
+                peak_to_peak, minimum, maximum, jerk]
+
+    def _extract_freq_features(self, signal: np.ndarray, fs: float = 256.0) -> list[float]:
+        """Extract frequency-domain features from signal.
+        
+        Args:
+            signal (np.ndarray): 1D acceleration signal.
+            fs (float): Sampling frequency in Hz.
+            
+        Returns:
+            list[float]: 5 frequency-domain features.
+        """
+        freqs, psd = welch(signal, fs)
+        psd_norm = psd / np.sum(psd)
+        
+        centroid = np.sum(freqs * psd_norm)
+        spread = np.sqrt(np.sum(((freqs - centroid)**2) * psd_norm))
+        skewness = np.sum(((freqs - centroid)**3) * psd_norm) / (spread**3) if spread > 0 else 0
+        kurtosis = np.sum(((freqs - centroid)**4) * psd_norm) / (spread**4) if spread > 0 else 0
+        entropy = stats.entropy(psd_norm + 1e-12)
+        
+        return [centroid, spread, skewness, kurtosis, entropy]
+
+    def _compute_group_id(self, group: pd.DataFrame) -> int:
+        """Compute EOV group ID from experiment metadata.
+        
+        Args:
+            group (pd.DataFrame): Sample data for one ExperimentID + NodeID.
+            
+        Returns:
+            int: Unique group ID based on EOV combination.
+        """
+        velocidade = group["Velocidade"].iloc[0]
+        peso = group["Peso_Vagao"].iloc[0]
+        modulo = group["Modulo_Elasticidade"].iloc[0]
+        
+        return hash((velocidade, peso, modulo)) % 10000
 
     @abstractmethod
     def split_fold(

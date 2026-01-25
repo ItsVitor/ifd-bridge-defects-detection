@@ -11,7 +11,7 @@ class TestPipeline(BridgeDefectPipeline):
 
     def extract_features(self, raw_data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Stub implementation."""
-        raise NotImplementedError("Not yet implemented")
+        return super().extract_features(raw_data)
 
     def split_fold(
         self,
@@ -45,7 +45,14 @@ if __name__ == "__main__":
     raw_data = pipeline.load_data()
     
     print(f"\nLoaded {len(raw_data)} samples")
-    print(f"Columns: {list(raw_data.columns)}")
-    print(f"\nClass distribution:\n{raw_data['Class'].value_counts()}")
-    print(f"\nDano_Percentual distribution:\n{raw_data['Dano_Percentual'].value_counts()}")
-    print(f"\nFirst few rows:\n{raw_data.head()}")
+    print(f"Class distribution:\n{raw_data['Class'].value_counts()}")
+    
+    print("\nTesting extract_features()...")
+    X, y, groups = pipeline.extract_features(raw_data)
+    
+    print(f"\nFeature matrix shape: {X.shape}")
+    print(f"Labels shape: {y.shape}")
+    print(f"Groups shape: {groups.shape}")
+    print(f"\nFeatures per sample: {X.shape[1]} (expected: 3 axes × 15 features = 45)")
+    print(f"Unique groups: {len(np.unique(groups))}")
+    print(f"Class distribution: {np.bincount(y)}")
