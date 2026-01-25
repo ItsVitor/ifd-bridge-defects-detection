@@ -1,5 +1,6 @@
 """Template Method pattern for bridge defect detection pipeline."""
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -13,7 +14,34 @@ class BridgeDefectPipeline(ABC):
     
     Implements the 4-phase workflow: feature extraction, CV strategy,
     model training, and evaluation.
+    
+    Args:
+        data_dir (str): Path to data directory. Defaults to "./data".
+        file_config (list[tuple[str, int]] | None): List of (filename, class_label)
+            tuples. Defaults to standard 7-file configuration.
     """
+
+    def __init__(
+        self,
+        data_dir: str = "./data",
+        file_config: list[tuple[str, int]] | None = None,
+    ) -> None:
+        """Initialize pipeline with configurable data sources.
+        
+        Args:
+            data_dir (str): Path to data directory.
+            file_config (list[tuple[str, int]] | None): List of (filename, class_label).
+        """
+        self.data_dir = data_dir
+        self.file_config = file_config or [
+            ("healthy.parquet", 0),
+            ("slightly_damaged.parquet", 0),
+            ("damaged_d1.parquet", 1),
+            ("damaged_d2.parquet", 1),
+            ("damaged_d3.parquet", 1),
+            ("damaged_d4.parquet", 1),
+            ("damaged_d5.parquet", 1),
+        ]
 
     def run(self) -> dict[str, Any]:
         """Execute the complete pipeline.
@@ -43,14 +71,21 @@ class BridgeDefectPipeline(ABC):
         
         return self.aggregate_results(fold_results)
 
-    @abstractmethod
     def load_data(self) -> pd.DataFrame:
-        """Load and concatenate all 7 Parquet files.
+        """Load and concatenate all Parquet files.
         
         Returns:
             pd.DataFrame: Combined raw data with all samples.
         """
-        pass
+        dfs = []
+        for filename, class_label in self.file_config:
+            df = pd.read_parquet(os.path.join(self.data_dir, filename))
+            if "Dano_Percentual" not in df.columns:
+                df["Dano_Percentual"] = 0.0
+            df["Class"] = class_label
+            dfs.append(df)
+        
+        return pd.concat(dfs, ignore_index=True)
 
     @abstractmethod
     def extract_features(self, raw_data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

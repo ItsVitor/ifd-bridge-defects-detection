@@ -1,0 +1,51 @@
+"""Test script for bridge defect detection pipeline."""
+
+import numpy as np
+import pandas as pd
+
+from pipeline_template import BridgeDefectPipeline
+
+
+class TestPipeline(BridgeDefectPipeline):
+    """Minimal implementation for testing load_data."""
+
+    def extract_features(self, raw_data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Stub implementation."""
+        raise NotImplementedError("Not yet implemented")
+
+    def split_fold(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        groups: np.ndarray,
+        fold_id: int,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Stub implementation."""
+        raise NotImplementedError("Not yet implemented")
+
+    def train_model(self, X_train: np.ndarray, y_train: np.ndarray):
+        """Stub implementation."""
+        raise NotImplementedError("Not yet implemented")
+
+
+if __name__ == "__main__":
+    pipeline = TestPipeline(
+        file_config=[
+            ("healthy.parquet", 0),
+            ("slightly_damaged.parquet", 0),
+            ("damaged_d1.parquet", 1),
+            ("damaged_d2.parquet", 1),
+            ("damaged_d3.parquet", 1),
+            ("damaged_d4.parquet", 1),
+            ("damaged_d4.parquet", 1),
+        ]
+    )
+    
+    print("Testing load_data()...")
+    raw_data = pipeline.load_data()
+    
+    print(f"\nLoaded {len(raw_data)} samples")
+    print(f"Columns: {list(raw_data.columns)}")
+    print(f"\nClass distribution:\n{raw_data['Class'].value_counts()}")
+    print(f"\nDano_Percentual distribution:\n{raw_data['Dano_Percentual'].value_counts()}")
+    print(f"\nFirst few rows:\n{raw_data.head()}")
