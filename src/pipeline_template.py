@@ -158,7 +158,7 @@ class BridgeDefectPipeline(ABC):
         spread = np.sqrt(np.sum(((freqs - centroid)**2) * psd_norm))
         skewness = np.sum(((freqs - centroid)**3) * psd_norm) / (spread**3) if spread > 0 else 0
         kurtosis = np.sum(((freqs - centroid)**4) * psd_norm) / (spread**4) if spread > 0 else 0
-        entropy = stats.entropy(psd_norm + 1e-12)
+        entropy = stats.entropy(psd_norm + 1e-12, base=2) # Not absolutely sure that I should use base 2 here
         
         return [centroid, spread, skewness, kurtosis, entropy]
 
