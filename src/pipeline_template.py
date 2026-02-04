@@ -94,11 +94,18 @@ class BridgeDefectPipeline(ABC):
             pd.DataFrame: Combined raw data with all samples.
         """
         dfs = []
+        exp_id_offset = 0
+        
         for filename, class_label in tqdm(self.file_config, desc="Loading data files"):
             df = pd.read_parquet(os.path.join(self.data_dir, filename))
             if "Dano_Percentual" not in df.columns:
                 df["Dano_Percentual"] = 0.0
             df["Class"] = class_label
+            
+            # Add offset to ExperimentID to ensure uniqueness across files
+            df["ExperimentID"] = df["ExperimentID"] + exp_id_offset
+            exp_id_offset += df["ExperimentID"].max() + 1
+            
             dfs.append(df)
         
         return pd.concat(dfs, ignore_index=True)
