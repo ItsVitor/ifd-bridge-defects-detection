@@ -6,14 +6,18 @@
 
 1. **Data Loading:**
     * Iterate through all 7 Parquet files defined in `data.md`.
-    * **Grouping:** Process data per **Sample** (defined as a unique `ExperimentID` + `NodeID` pair).
+    * **Grouping:** Process data per **Sample** (defined as a unique `ExperimentID`).
 2. **Calculation:**
-    * For each Sample, process all 3 axes (`Accel_X`, `Accel_Y`, `Accel_Z`) independently.
-    * **Time-Domain Features (per axis):** Calculate Mean, Covariance (Variance), Kurtosis, RMS, Peak-to-RMS, RSS, Peak-to-Peak, Minimum, Maximum, and Feature-jerk.
-    * **Frequency-Domain Features (per axis):** Calculate PSD (using $f_s=256$ Hz), then extract Spectral Centroid, Spread, Skewness, Kurtosis, and Entropy.
+    * For each Sample (experiment), process all 18 sensor nodes.
+    * For each node, process all 3 axes (`Accel_X`, `Accel_Y`, `Accel_Z`) independently.
+    * **Time-Domain Features (per axis per node):** Calculate Mean, Covariance (Variance), Kurtosis, RMS, Peak-to-RMS, RSS, Peak-to-Peak, Minimum, Maximum, and Feature-jerk.
+    * **Frequency-Domain Features (per axis per node):** Calculate PSD (using $f_s=256$ Hz), then extract Spectral Centroid, Spread, Skewness, Kurtosis, and Entropy.
 3. **Output Structure:**
-    * Create a Master Feature Matrix where rows = Samples, columns = 18 sensors $\times$ 3 axes $\times$ (N Time Features + M Freq Features).
-    * **Metadata Vectors:** Keep aligned vectors for `Group_ID` (EOV combination), `Class_Label` (0=Healthy/Slightly Damaged, 1=Damaged), and `Experiment_ID`.
+    * Create a Master Feature Matrix where:
+      * **Rows** = Experiments (one row per ExperimentID)
+      * **Columns** = 810 features (18 nodes $\times$ 3 axes $\times$ 15 features)
+      * **Feature Naming**: `{axis}_N{node_id}_{feature}` (e.g., `X_N1_mean`, `Z_N18_entropy`)
+    * **Metadata Columns:** `Group_ID` (EOV combination) and `Class` (0=Healthy/Slightly Damaged, 1=Damaged).
 
 ---
 
