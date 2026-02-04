@@ -9,6 +9,7 @@ import pandas as pd
 from scipy import stats
 from scipy.signal import welch
 from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 
 
 class BridgeDefectPipeline(ABC):
@@ -54,6 +55,7 @@ class BridgeDefectPipeline(ABC):
         # Phase 1: Data Loading and Feature Extraction
         raw_data = self.load_data()
         X, y, groups = self.extract_features(raw_data)
+        feature_df = self.extract_features(raw_data)
         
         # Phase 2: Cross-Validation Loop
         fold_results = []
@@ -80,7 +82,7 @@ class BridgeDefectPipeline(ABC):
             pd.DataFrame: Combined raw data with all samples.
         """
         dfs = []
-        for filename, class_label in self.file_config:
+        for filename, class_label in tqdm(self.file_config, desc="Loading data files"):
             df = pd.read_parquet(os.path.join(self.data_dir, filename))
             if "Dano_Percentual" not in df.columns:
                 df["Dano_Percentual"] = 0.0
@@ -89,33 +91,55 @@ class BridgeDefectPipeline(ABC):
         
         return pd.concat(dfs, ignore_index=True)
 
-    def extract_features(self, raw_data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def extract_features(self, raw_data: pd.DataFrame) -> pd.DataFrame:
         """Extract time and frequency domain features from raw data.
         
         Args:
             raw_data (pd.DataFrame): Raw acceleration data from load_data.
         
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: Feature matrix X,
-                labels y, and group IDs.
+            pd.DataFrame: Master feature matrix with one row per experiment.
+                Each row contains 810 features (18 nodes × 3 axes × 15 features)
+                plus 'Class' and 'Group_ID' metadata columns.
         """
-        samples = raw_data.groupby(["ExperimentID", "NodeID"])
-        feature_list = []
-        labels = []
-        groups = []
+        experiments = raw_data.groupby("ExperimentID")
+        rows = []
         
-        for (exp_id, node_id), group in samples:
-            features = []
-            for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
-                signal = group[axis].values
-                features.extend(self._extract_time_features(signal))
-                features.extend(self._extract_freq_features(signal))
+        for exp_id, exp_group in tqdm(experiments, desc="Extracting features"):
+            row = {}
             
-            feature_list.append(features)
-            labels.append(group["Class"].iloc[0])
-            groups.append(self._compute_group_id(group))
+            # Process each node
+            for node_id in sorted(exp_group["NodeID"].unique()):
+                node_data = exp_group[exp_group["NodeID"] == node_id]
+                
+                # Process each axis for this node
+                for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
+                    signal = node_data[axis].values
+                    time_features = self._extract_time_features(signal)
+                    freq_features = self._extract_freq_features(signal)
+                    
+                    axis_name = axis.split('_')[1]  # 'X', 'Y', or 'Z'
+                    feature_names = [
+                        f"{axis_name}_N{node_id}_mean", f"{axis_name}_N{node_id}_var",
+                        f"{axis_name}_N{node_id}_kurt", f"{axis_name}_N{node_id}_rms",
+                        f"{axis_name}_N{node_id}_peak_to_rms", f"{axis_name}_N{node_id}_rss",
+                        f"{axis_name}_N{node_id}_peak_to_peak", f"{axis_name}_N{node_id}_min",
+                        f"{axis_name}_N{node_id}_max", f"{axis_name}_N{node_id}_jerk",
+                        f"{axis_name}_N{node_id}_spectral_centroid",
+                        f"{axis_name}_N{node_id}_spectral_spread",
+                        f"{axis_name}_N{node_id}_spectral_skewness",
+                        f"{axis_name}_N{node_id}_spectral_kurtosis",
+                        f"{axis_name}_N{node_id}_spectral_entropy"
+                    ]
+                    
+                    for name, value in zip(feature_names, time_features + freq_features):
+                        row[name] = value
+            
+            row['Class'] = exp_group['Class'].iloc[0]
+            row['Group_ID'] = self._compute_group_id(exp_group)
+            rows.append(row)
         
-        return np.array(feature_list), np.array(labels), np.array(groups)
+        return pd.DataFrame(rows)
 
     def _extract_time_features(self, signal: np.ndarray) -> list[float]:
         """Extract time-domain features from signal.
@@ -166,16 +190,25 @@ class BridgeDefectPipeline(ABC):
         """Compute EOV group ID from experiment metadata.
         
         Args:
-            group (pd.DataFrame): Sample data for one ExperimentID + NodeID.
+            group (pd.DataFrame): Sample data for one ExperimentID.
             
         Returns:
-            int: Unique group ID based on EOV combination.
+            int: Unique group ID based on EOV combination (1-45).
         """
         velocidade = group["Velocidade"].iloc[0]
         peso = group["Peso_Vagao"].iloc[0]
         modulo = group["Modulo_Elasticidade"].iloc[0]
         
-        return hash((velocidade, peso, modulo)) % 10000
+        eov_tuple = (velocidade, peso, modulo)
+        if not hasattr(self, '_eov_mapping'):
+            self._eov_mapping = {}
+            self._next_group_id = 1
+        
+        if eov_tuple not in self._eov_mapping:
+            self._eov_mapping[eov_tuple] = self._next_group_id
+            self._next_group_id += 1
+        
+        return self._eov_mapping[eov_tuple]
 
     @abstractmethod
     def split_fold(
