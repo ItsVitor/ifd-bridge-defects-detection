@@ -70,9 +70,9 @@ class BridgeDefectPipeline(ABC):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
             
-            # Validate training and test sets
-            self._validate_training_set(y_train, fold_idx)
-            self._validate_test_set(y_test, fold_idx)
+            # Validate and prepare training/test sets (model-specific)
+            X_train, y_train = self._prepare_training_set(X_train, y_train, fold_idx)
+            X_test, y_test = self._prepare_test_set(X_test, y_test, fold_idx)
             
             # Normalize
             X_train_scaled, X_test_scaled = self.normalize(X_train, X_test)
@@ -155,7 +155,7 @@ class BridgeDefectPipeline(ABC):
                         row[name] = value
             
             row['Class'] = exp_group['Class'].iloc[0]
-            row['Group_ID'] = self._compute_group_id(exp_group)
+            row['Group_ID'] = self._compute_group_id(exp_group) # TODO: conferir a construção do Group_ID
             rows.append(row)
         
         return pd.DataFrame(rows)
@@ -266,33 +266,38 @@ class BridgeDefectPipeline(ABC):
         
         return PredefinedSplit(test_fold)
     
-    def _validate_training_set(self, y_train: np.ndarray, fold_id: int) -> None:
-        """Validate that training set contains only healthy samples (Class 0).
+    def _prepare_training_set(
+        self, X_train: np.ndarray, y_train: np.ndarray, fold_id: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Prepare training set (model-specific filtering/validation).
+        
+        Base implementation does nothing. Override in subclasses for
+        model-specific requirements (e.g., unsupervised models filter to Class 0).
         
         Args:
+            X_train (np.ndarray): Training features.
             y_train (np.ndarray): Training labels.
-            fold_id (int): Current fold number for warning message.
+            fold_id (int): Current fold number.
             
-        Raises:
-            UserWarning: If damaged samples (Class 1) are found in training set.
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Prepared X_train and y_train.
         """
-        damaged_count = np.sum(y_train == 1)
-        if damaged_count > 0:
-            warnings.warn(
-                f"Fold {fold_id}: Training set contains {damaged_count} damaged samples (Class 1). "
-                f"Expected only healthy samples (Class 0) for unsupervised learning.",
-                UserWarning
-            )
+        return X_train, y_train
     
-    def _validate_test_set(self, y_test: np.ndarray, fold_id: int) -> None:
-        """Validate that test set has balanced 1:1 ratio of healthy to damaged samples.
+    def _prepare_test_set(
+        self, X_test: np.ndarray, y_test: np.ndarray, fold_id: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Prepare test set (balancing/validation).
+        
+        Base implementation validates 1:1 balance and warns if not balanced.
         
         Args:
+            X_test (np.ndarray): Test features.
             y_test (np.ndarray): Test labels.
-            fold_id (int): Current fold number for warning message.
+            fold_id (int): Current fold number.
             
-        Raises:
-            UserWarning: If test set is not balanced 1:1.
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Prepared X_test and y_test.
         """
         class_counts = np.bincount(y_test)
         if len(class_counts) < 2:
@@ -307,6 +312,7 @@ class BridgeDefectPipeline(ABC):
                 f"Expected 1:1 ratio.",
                 UserWarning
             )
+        return X_test, y_test
 
     def normalize(
         self, X_train: np.ndarray, X_test: np.ndarray
