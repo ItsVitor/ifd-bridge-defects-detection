@@ -1,6 +1,7 @@
 """Template Method pattern for bridge defect detection pipeline."""
 
 import os
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -8,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.signal import welch
+from sklearn.model_selection import PredefinedSplit
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
@@ -54,15 +56,25 @@ class BridgeDefectPipeline(ABC):
         """
         # Phase 1: Data Loading and Feature Extraction
         raw_data = self.load_data()
-        X, y, groups = self.extract_features(raw_data)
         feature_df = self.extract_features(raw_data)
         
-        # Phase 2: Cross-Validation Loop
+        # Phase 2: Cross-Validation Setup
+        X = feature_df.drop(columns=['Class', 'Group_ID']).values
+        y = feature_df['Class'].values
+        groups = feature_df['Group_ID'].values
+        
+        cv_splitter = self._create_cv_splitter(groups)
+        
         fold_results = []
-        for fold_id in range(1, 11):
-            X_train, X_test, y_train, y_test = self.split_fold(
-                X, y, groups, fold_id
-            )
+        for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X, y), start=1):
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+            
+            # Validate training and test sets
+            self._validate_training_set(y_train, fold_idx)
+            self._validate_test_set(y_test, fold_idx)
+            
+            # Normalize
             X_train_scaled, X_test_scaled = self.normalize(X_train, X_test)
             
             # Phase 3: Model Training
@@ -210,27 +222,84 @@ class BridgeDefectPipeline(ABC):
         
         return self._eov_mapping[eov_tuple]
 
-    @abstractmethod
-    def split_fold(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-        groups: np.ndarray,
-        fold_id: int,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Partition data using assignment matrix for given fold.
+    def _get_fold_assignment(self) -> dict[int, list[int]]:
+        """Get assignment matrix mapping fold IDs to EOV group IDs.
+        
+        Returns:
+            dict[int, list[int]]: Mapping of fold_id to list of group_ids.
+        """
+        return {
+            1: [1, 2, 3, 4],
+            2: [5, 6, 7, 8],
+            3: [9, 10, 11, 12],
+            4: [13, 14, 15, 16],
+            5: [17, 18, 19, 20],
+            6: [21, 22, 23, 24, 25],
+            7: [26, 27, 28, 29, 30],
+            8: [31, 32, 33, 34, 35],
+            9: [36, 37, 38, 39, 40],
+            10: [41, 42, 43, 44, 45],
+        }
+    
+    def _create_cv_splitter(self, groups: np.ndarray) -> PredefinedSplit:
+        """Create PredefinedSplit cross-validator from assignment matrix.
         
         Args:
-            X (np.ndarray): Feature matrix.
-            y (np.ndarray): Class labels.
-            groups (np.ndarray): EOV group IDs.
-            fold_id (int): Current fold number (1-10).
+            groups (np.ndarray): EOV group IDs for each sample.
             
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-                X_train, X_test, y_train, y_test (test set balanced 1:1).
+            PredefinedSplit: Configured cross-validator with 10 folds.
         """
-        pass
+        assignment = self._get_fold_assignment()
+        test_fold = np.full(len(groups), -1, dtype=int)
+        
+        for fold_id, test_groups in assignment.items():
+            mask = np.isin(groups, test_groups)
+            test_fold[mask] = fold_id - 1
+        
+        return PredefinedSplit(test_fold)
+    
+    def _validate_training_set(self, y_train: np.ndarray, fold_id: int) -> None:
+        """Validate that training set contains only healthy samples (Class 0).
+        
+        Args:
+            y_train (np.ndarray): Training labels.
+            fold_id (int): Current fold number for warning message.
+            
+        Raises:
+            UserWarning: If damaged samples (Class 1) are found in training set.
+        """
+        damaged_count = np.sum(y_train == 1)
+        if damaged_count > 0:
+            warnings.warn(
+                f"Fold {fold_id}: Training set contains {damaged_count} damaged samples (Class 1). "
+                f"Expected only healthy samples (Class 0) for unsupervised learning.",
+                UserWarning
+            )
+    
+    def _validate_test_set(self, y_test: np.ndarray, fold_id: int) -> None:
+        """Validate that test set has balanced 1:1 ratio of healthy to damaged samples.
+        
+        Args:
+            y_test (np.ndarray): Test labels.
+            fold_id (int): Current fold number for warning message.
+            
+        Raises:
+            UserWarning: If test set is not balanced 1:1.
+        """
+        class_counts = np.bincount(y_test)
+        if len(class_counts) < 2:
+            warnings.warn(
+                f"Fold {fold_id}: Test set contains only one class. "
+                f"Expected balanced 1:1 ratio of healthy to damaged samples.",
+                UserWarning
+            )
+        elif class_counts[0] != class_counts[1]:
+            warnings.warn(
+                f"Fold {fold_id}: Test set is imbalanced - Class 0: {class_counts[0]}, Class 1: {class_counts[1]}. "
+                f"Expected 1:1 ratio.",
+                UserWarning
+            )
 
     def normalize(
         self, X_train: np.ndarray, X_test: np.ndarray

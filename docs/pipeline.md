@@ -25,18 +25,22 @@
 
 **Objective:** Perform 10-Fold Group Cross-Validation to evaluate model performance.
 
-* **Split Strategy:** Use the pre-defined "Assignment Matrix" (Table 4 in the article) to assign specific EOV groups to the **Test Set** for each fold.
-* **Loop:** Iterate `Fold_ID` from 1 to 10.
+* **Split Strategy:** Use the pre-defined "Assignment Matrix" (images/Cross-validation folds table.png) to assign specific EOV groups to the **Test Set** for each fold.
+Dataset contains 45 EOV groups (combinations of speed, mass, elasticity), this is the 10-fold cross-validation setup:
 
-### Inside Each Fold
+  * Folds 1-5: 4 EOV groups each;
 
-#### Step 2.1: Data Partitioning
+  * Folds 6-10: 5 EOV groups each.
+
+Each fold's test set uses unique EOV groups not seen in training.
+
+### Step 2.1: Data Partitioning
 
 1. **Test Set:** Select all samples belonging to the EOV groups assigned to the current `Fold_ID`.
 2. **Training Set:** Select all samples belonging to the remaining EOV groups.
 3. **Strict Balancing:** Ensure the Test Set has exactly a 1:1 ratio of Healthy to Damaged samples (downsample the majority class if necessary).
 
-#### Step 2.2: Data Normalization (Anti-Leakage)
+### Step 2.2: Data Normalization (Anti-Leakage)
 
 1. Initialize a `StandardScaler`.
 2. **Fit** the scaler using **only** the Training Data.
