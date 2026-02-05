@@ -72,7 +72,9 @@ class BridgeDefectPipeline(ABC):
             groups_train = groups[train_idx]
             
             # Validate and prepare training/test sets (model-specific)
-            X_train, y_train = self._prepare_training_set(X_train, y_train, fold_idx)
+            X_train, y_train, groups_train = self._prepare_training_set(
+                X_train, y_train, groups_train, fold_idx
+            )
             X_test, y_test = self._prepare_test_set(X_test, y_test, fold_idx)
             
             # Normalize
@@ -268,8 +270,12 @@ class BridgeDefectPipeline(ABC):
         return PredefinedSplit(test_fold)
     
     def _prepare_training_set(
-        self, X_train: np.ndarray, y_train: np.ndarray, fold_id: int
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        groups_train: np.ndarray,
+        fold_id: int,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Prepare training set (model-specific filtering/validation).
         
         Base implementation does nothing. Override in subclasses for
@@ -281,9 +287,9 @@ class BridgeDefectPipeline(ABC):
             fold_id (int): Current fold number.
             
         Returns:
-            tuple[np.ndarray, np.ndarray]: Prepared X_train and y_train.
+            tuple[np.ndarray, np.ndarray, np.ndarray]: Prepared X_train, y_train, and groups_train.
         """
-        return X_train, y_train
+        return X_train, y_train, groups_train
     
     def _prepare_test_set(
         self, X_test: np.ndarray, y_test: np.ndarray, fold_id: int
