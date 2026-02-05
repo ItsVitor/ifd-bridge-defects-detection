@@ -69,6 +69,7 @@ class BridgeDefectPipeline(ABC):
         for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X, y), start=1):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
+            groups_train = groups[train_idx]
             
             # Validate and prepare training/test sets (model-specific)
             X_train, y_train = self._prepare_training_set(X_train, y_train, fold_idx)
@@ -78,7 +79,7 @@ class BridgeDefectPipeline(ABC):
             X_train_scaled, X_test_scaled = self.normalize(X_train, X_test)
             
             # Phase 3: Model Training
-            model = self.train_model(X_train_scaled, y_train)
+            model = self.train_model(X_train_scaled, y_train, groups_train)
             y_pred = model.predict(X_test_scaled)
             
             # Phase 4: Evaluation
@@ -332,12 +333,15 @@ class BridgeDefectPipeline(ABC):
         return X_train_scaled, X_test_scaled
 
     @abstractmethod
-    def train_model(self, X_train: np.ndarray, y_train: np.ndarray) -> Any:
+    def train_model(
+        self, X_train: np.ndarray, y_train: np.ndarray, groups_train: np.ndarray
+    ) -> Any:
         """Train model with hyperparameter optimization and feature selection.
         
         Args:
             X_train (np.ndarray): Training features (scaled).
             y_train (np.ndarray): Training labels.
+            groups_train (np.ndarray): Group IDs for training samples.
             
         Returns:
             Any: Trained model instance.
