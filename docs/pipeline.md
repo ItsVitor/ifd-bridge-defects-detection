@@ -40,7 +40,13 @@ Each fold's test set uses unique EOV groups not seen in training.
 2. **Training Set:** Select all samples belonging to the remaining EOV groups.
 3. **Strict Balancing:** Ensure the Test Set has exactly a 1:1 ratio of Healthy to Damaged samples (downsample the majority class if necessary).
 
-### Step 2.2: Data Normalization (Anti-Leakage)
+### Step 2.2: Feature Filtering
+
+1. **Variance Threshold Filter:** Remove features with low variance (filter method).
+2. **Fit** the filter using **only** the Training Data.
+3. **Transform** both Training and Test Data using the fitted filter.
+
+### Step 2.3: Data Normalization (Anti-Leakage)
 
 1. Initialize a `StandardScaler`.
 2. **Fit** the scaler using **only** the Training Data.
@@ -49,30 +55,24 @@ Each fold's test set uses unique EOV groups not seen in training.
 
 ---
 
-## 3. Model Training & Selection (The Inner Loop)
+## 3. Model Training
 
-**Objective:** Optimize Hyperparameters and Features.
+**Objective:** Train models with literature-based hyperparameters.
 
 ### Branch A: Unsupervised Models (OCSVM & Isolation Forest)
 
-* **Optimization Split (Group Shuffle Split):**
-  * Partition the **Training Set Pool** into 80% Inner Train and 20% Inner Validation.
-  * **Inner Train Set:** Keep **ONLY** Healthy samples (`Class 0`). The model must effectively learn "Normality" from this set.
-  * **Inner Validation Set:** Keep **BOTH** Healthy (`Class 0`) and Damaged (`Class 1`) samples. This serves to calibrate the discrimination capability of the selected features.
-* **Optimization Routine (Grid Search + SFS):**
-    1. **Grid Search:** Iterate through every hyperparameter combination.
-    2. **Feature Selection (Wrapper):**
-        * **Train:** Fit OCSVM/iForest on the **Inner Train (Healthy Only)**.
-        * **Evaluate:** Predict on **Inner Validation (Healthy + Damaged)**.
-        * **Metric:** Maximize Accuracy.
-    3. **Selection:** Identify the best configuration based on the Validation metric.
-* **Final Training:** Retrain the optimal model configuration on the **Full Healthy Training Pool** (excluding all damaged data).
+* **Training Data:** Use **ONLY** Healthy samples (`Class 0`) from the Training partition.
+* **Hyperparameters:** Fixed values based on literature recommendations (no optimization).
+* **Training:** Fit model on healthy samples to learn "normality".
 * **Prediction:** Predict class labels for the **Outer Test Set**.
+  * OCSVM: Inliers (1) → Healthy (0), Outliers (-1) → Damaged (1)
+  * Isolation Forest: Inliers (1) → Healthy (0), Outliers (-1) → Damaged (1)
 
 ### Branch B: Upper Bound Baseline (Random Forest)
 
 * **Training Data:** Use **BOTH** Healthy (`0`) and Damaged (`1`) samples from the Training partition.
-* **Optimization:** Perform the same Nested Grid Search + SFS routine as above
+* **Hyperparameters:** Fixed values based on literature recommendations.
+* **Training:** Standard supervised learning.
 * **Prediction:** Predict class labels for the **Test Set**.
 
 ---

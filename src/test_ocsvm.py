@@ -4,6 +4,7 @@ from ocsvm_pipeline import OCSVMPipeline
 
 
 if __name__ == "__main__":
+    # Initialize pipeline with literature-based hyperparameters
     pipeline = OCSVMPipeline(
         file_config=[
             ("healthy.parquet", 0),
@@ -13,12 +14,16 @@ if __name__ == "__main__":
             ("damaged_d3.parquet", 1),
             ("damaged_d4.parquet", 1),
             ("damaged_d4.parquet", 1),
-        ]
+        ],
+        nu=0.1,
+        kernel='rbf',
+        gamma='scale'
     )
     
     print("=" * 60)
     print("OCSVM PIPELINE TEST")
     print("=" * 60)
+    print(f"\nHyperparameters: nu={pipeline.nu}, kernel={pipeline.kernel}, gamma={pipeline.gamma}")
     
     print("\nRunning full pipeline...")
     results = pipeline.run()

@@ -1,80 +1,81 @@
 """OCSVM pipeline implementation for bridge defect detection."""
 
-import warnings
-
 import numpy as np
-from sklearn.feature_selection import SequentialFeatureSelector
-from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 from sklearn.svm import OneClassSVM
 
 from pipeline_template import BridgeDefectPipeline
 
 
 class OCSVMPipeline(BridgeDefectPipeline):
-    """One-Class SVM pipeline with nested Grid Search and SFS.
+    """One-Class SVM pipeline with literature-based hyperparameters.
     
     Implements unsupervised anomaly detection trained only on healthy samples.
+    Uses fixed hyperparameters based on literature recommendations.
+    
+    Args:
+        nu (float): OCSVM nu parameter (upper bound on fraction of outliers).
+        kernel (str): Kernel type.
+        gamma (str | float): Kernel coefficient.
     """
-
-    def _prepare_training_set(
+    
+    def __init__(
         self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
-        groups_train: np.ndarray,
-        fold_id: int,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Filter training set to healthy samples only and validate.
+        data_dir: str = "./data",
+        file_config: list[tuple[str, int]] | None = None,
+        nu: float = 0.1,
+        kernel: str = 'rbf',
+        gamma: str | float = 'scale'
+    ) -> None:
+        """Initialize OCSVM pipeline with hyperparameters.
         
         Args:
-            X_train (np.ndarray): Training features.
-            y_train (np.ndarray): Training labels.
-            groups_train (np.ndarray): Group IDs for training samples.
-            fold_id (int): Current fold number.
-            
-        Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: Filtered X_train, y_train,
-                and groups_train (Class 0 only).
+            data_dir (str): Path to data directory.
+            file_config (list[tuple[str, int]] | None): List of (filename, class_label).
+            nu (float): OCSVM nu parameter.
+            kernel (str): Kernel type.
+            gamma (str | float): Kernel coefficient.
         """
-        damaged_count = np.sum(y_train == 1)
-        if damaged_count > 0:
-            warnings.warn(
-                f"Fold {fold_id}: Filtering out {damaged_count} damaged samples from training set. "
-                f"OCSVM requires only healthy samples (Class 0).",
-                UserWarning
-            )
-        
-        healthy_mask = y_train == 0
-        return X_train[healthy_mask], y_train[healthy_mask], groups_train[healthy_mask]
+        super().__init__(data_dir, file_config)
+        self.nu = nu
+        self.kernel = kernel
+        self.gamma = gamma
 
     def train_model(
-        self, X_train: np.ndarray, y_train: np.ndarray, groups_train: np.ndarray
-    ) -> SequentialFeatureSelector:
-        """Train OCSVM with nested Grid Search, SFS, and Group Shuffle Split.
+        self, X_train: np.ndarray, y_train: np.ndarray
+    ) -> OneClassSVM:
+        """Train OCSVM on healthy samples only with fixed hyperparameters.
         
         Args:
-            X_train (np.ndarray): Training features (scaled, Class 0 only).
-            y_train (np.ndarray): Training labels (all Class 0).
-            groups_train (np.ndarray): Group IDs for training samples.
+            X_train (np.ndarray): Training features (scaled, variance-filtered).
+            y_train (np.ndarray): Training labels (Class 0 and 1).
             
         Returns:
-            SequentialFeatureSelector: SFS wrapper containing trained OCSVM
-                with optimal hyperparameters and selected features.
+            OneClassSVM: Trained model.
         """
-        param_grid = {
-            'estimator__nu': [0.01, 0.1],
-            'estimator__gamma': ['scale'],
-            'estimator__kernel': ['rbf']
-        }
+        # Filter to healthy samples only
+        healthy_mask = y_train == 0
+        X_healthy = X_train[healthy_mask]
         
-        base_model = OneClassSVM(verbose=True)
-        sfs = SequentialFeatureSelector(
-            base_model, n_features_to_select='auto', direction='forward', scoring='accuracy'
-        )
-        inner_cv = GroupShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
+        print(f"Training OCSVM on {X_healthy.shape[0]} healthy samples with {X_healthy.shape[1]} features")
+        print(f"Hyperparameters: nu={self.nu}, kernel={self.kernel}, gamma={self.gamma}")
         
-        grid_search = GridSearchCV(
-            sfs, param_grid, cv=inner_cv, scoring='accuracy', n_jobs=-1, verbose=3
-        )
-        grid_search.fit(X_train, y_train, groups=groups_train)
+        # Train OCSVM
+        model = OneClassSVM(nu=self.nu, kernel=self.kernel, gamma=self.gamma)
+        model.fit(X_healthy)
         
-        return grid_search.best_estimator_
+        return model
+    
+    def predict(self, model: OneClassSVM, X: np.ndarray) -> np.ndarray:
+        """Predict using OCSVM and convert to binary labels.
+        
+        Args:
+            model (OneClassSVM): Trained OCSVM model.
+            X (np.ndarray): Features.
+            
+        Returns:
+            np.ndarray: Binary predictions (0=healthy, 1=damaged).
+        """
+        # OCSVM returns: 1 (inlier/healthy), -1 (outlier/damaged)
+        # Convert to: 0 (healthy), 1 (damaged)
+        predictions = model.predict(X)
+        return np.where(predictions == 1, 0, 1)

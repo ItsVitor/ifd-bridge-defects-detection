@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.signal import welch
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import PredefinedSplit
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
@@ -71,18 +72,26 @@ class BridgeDefectPipeline(ABC):
             y_train, y_test = y[train_idx], y[test_idx]
             groups_train = groups[train_idx]
             
-            # Validate and prepare training/test sets (model-specific)
-            X_train, y_train, groups_train = self._prepare_training_set(
-                X_train, y_train, groups_train, fold_idx
-            )
+            # Prepare test set (model-specific balancing/validation)
             X_test, y_test = self._prepare_test_set(X_test, y_test, fold_idx)
             
-            # Normalize
-            X_train_scaled, X_test_scaled = self.normalize(X_train, X_test)
+            # Filter: Remove low-variance features (before scaling)
+            variance_filter = VarianceThreshold(threshold=0.1)
+            X_train_filtered = variance_filter.fit_transform(X_train)
+            X_test_filtered = variance_filter.transform(X_test)
+            print(f"Fold {fold_idx}: Features after variance filter: {X_train_filtered.shape[1]}/{X_train.shape[1]}")
             
-            # Phase 3: Model Training
-            model = self.train_model(X_train_scaled, y_train, groups_train)
+            # Normalize
+            X_train_scaled, X_test_scaled = self.normalize(X_train_filtered, X_test_filtered)
+            
+            # Phase 3: Model Training (healthy samples only for unsupervised)
+            model = self.train_model(X_train_scaled, y_train)
+            
+            # Predict (handle OCSVM output conversion if needed)
             y_pred = model.predict(X_test_scaled)
+            # Convert OCSVM output: 1 (inlier) → 0 (healthy), -1 (outlier) → 1 (damaged)
+            if np.any(y_pred == -1):
+                y_pred = np.where(y_pred == 1, 0, 1)
             
             # Phase 4: Evaluation
             metrics = self.evaluate_fold(y_test, y_pred)
@@ -269,27 +278,7 @@ class BridgeDefectPipeline(ABC):
         
         return PredefinedSplit(test_fold)
     
-    def _prepare_training_set(
-        self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
-        groups_train: np.ndarray,
-        fold_id: int,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Prepare training set (model-specific filtering/validation).
-        
-        Base implementation does nothing. Override in subclasses for
-        model-specific requirements (e.g., unsupervised models filter to Class 0).
-        
-        Args:
-            X_train (np.ndarray): Training features.
-            y_train (np.ndarray): Training labels.
-            fold_id (int): Current fold number.
-            
-        Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: Prepared X_train, y_train, and groups_train.
-        """
-        return X_train, y_train, groups_train
+
     
     def _prepare_test_set(
         self, X_test: np.ndarray, y_test: np.ndarray, fold_id: int
@@ -340,14 +329,16 @@ class BridgeDefectPipeline(ABC):
 
     @abstractmethod
     def train_model(
-        self, X_train: np.ndarray, y_train: np.ndarray, groups_train: np.ndarray
+        self, X_train: np.ndarray, y_train: np.ndarray
     ) -> Any:
-        """Train model with hyperparameter optimization and feature selection.
+        """Train model with literature-based hyperparameters.
+        
+        For unsupervised models: filters to healthy samples only (Class 0).
+        For supervised models: uses both classes.
         
         Args:
-            X_train (np.ndarray): Training features (scaled).
+            X_train (np.ndarray): Training features (scaled, variance-filtered).
             y_train (np.ndarray): Training labels.
-            groups_train (np.ndarray): Group IDs for training samples.
             
         Returns:
             Any: Trained model instance.
