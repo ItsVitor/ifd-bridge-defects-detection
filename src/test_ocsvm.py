@@ -13,7 +13,7 @@ if __name__ == "__main__":
             ("damaged_d2.parquet", 1),
             ("damaged_d3.parquet", 1),
             ("damaged_d4.parquet", 1),
-            ("damaged_d4.parquet", 1),
+            ("damaged_d5.parquet", 1),
         ],
         nu=0.1,
         kernel='rbf',
