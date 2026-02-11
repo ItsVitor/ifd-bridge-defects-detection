@@ -42,9 +42,10 @@ Each fold's test set uses unique EOV groups not seen in training.
 
 ### Step 2.2: Feature Filtering
 
-1. **Variance Threshold Filter:** Remove features with low variance (filter method).
-2. **Fit** the filter using **only** the Training Data.
-3. **Transform** both Training and Test Data using the fitted filter.
+1. **Variance Threshold Filter**: Remove features with zero or near-zero variance.
+2. **Correlation Filter**: Remove highly correlated features (threshold=0.95) to reduce redundancy.
+3. **Fit** both filters using **only** the Training Data.
+4. **Transform** both Training and Test Data using the fitted filters.
 
 ### Step 2.3: Data Normalization (Anti-Leakage)
 
