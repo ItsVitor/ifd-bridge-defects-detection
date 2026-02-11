@@ -250,20 +250,27 @@ class BridgeDefectPipeline(ABC):
     def _get_fold_assignment(self) -> dict[int, list[int]]:
         """Get assignment matrix mapping fold IDs to EOV group IDs.
         
+        15 folds with 3 EOV groups each (45 total groups).
+        
         Returns:
             dict[int, list[int]]: Mapping of fold_id to list of group_ids.
         """
         return {
-            1: [1, 2, 3, 4],
-            2: [5, 6, 7, 8],
-            3: [9, 10, 11, 12],
-            4: [13, 14, 15, 16],
-            5: [17, 18, 19, 20],
-            6: [21, 22, 23, 24, 25],
-            7: [26, 27, 28, 29, 30],
-            8: [31, 32, 33, 34, 35],
-            9: [36, 37, 38, 39, 40],
-            10: [41, 42, 43, 44, 45],
+            1: [1, 2, 3],
+            2: [4, 5, 6],
+            3: [7, 8, 9],
+            4: [10, 11, 12],
+            5: [13, 14, 15],
+            6: [16, 17, 18],
+            7: [19, 20, 21],
+            8: [22, 23, 24],
+            9: [25, 26, 27],
+            10: [28, 29, 30],
+            11: [31, 32, 33],
+            12: [34, 35, 36],
+            13: [37, 38, 39],
+            14: [40, 41, 42],
+            15: [43, 44, 45],
         }
     
     def _create_cv_splitter(self, groups: np.ndarray) -> PredefinedSplit:
@@ -273,7 +280,7 @@ class BridgeDefectPipeline(ABC):
             groups (np.ndarray): EOV group IDs for each sample.
             
         Returns:
-            PredefinedSplit: Configured cross-validator with 10 folds.
+            PredefinedSplit: Configured cross-validator with 15 folds.
         """
         assignment = self._get_fold_assignment()
         test_fold = np.full(len(groups), -1, dtype=int)
