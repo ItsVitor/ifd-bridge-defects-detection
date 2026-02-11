@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 
 class BridgeDefectPipeline(ABC):
-    """Template for 10-fold group cross-validation pipeline.
+    """Template for 15-fold group cross-validation pipeline.
     
     Implements the 4-phase workflow: feature extraction, CV strategy,
     model training, and evaluation.
@@ -75,11 +75,17 @@ class BridgeDefectPipeline(ABC):
             # Prepare test set (model-specific balancing/validation)
             X_test, y_test = self._prepare_test_set(X_test, y_test, fold_idx)
             
-            # Filter: Remove low-variance features (before scaling)
-            variance_filter = VarianceThreshold(threshold=0.1)
+            # Filter: Remove low-variance and highly correlated features
+            variance_filter = VarianceThreshold(threshold=0.01)
             X_train_filtered = variance_filter.fit_transform(X_train)
             X_test_filtered = variance_filter.transform(X_test)
             print(f"Fold {fold_idx}: Features after variance filter: {X_train_filtered.shape[1]}/{X_train.shape[1]}")
+            
+            # Correlation filter: Remove redundant features
+            X_train_filtered, X_test_filtered, kept_features = self._remove_correlated_features(
+                X_train_filtered, X_test_filtered, threshold=0.95
+            )
+            print(f"Fold {fold_idx}: Features after correlation filter: {X_train_filtered.shape[1]}")
             
             # Normalize
             X_train_scaled, X_test_scaled = self.normalize(X_train_filtered, X_test_filtered)
@@ -279,6 +285,35 @@ class BridgeDefectPipeline(ABC):
         return PredefinedSplit(test_fold)
     
 
+    
+    def _remove_correlated_features(
+        self, X_train: np.ndarray, X_test: np.ndarray, threshold: float = 0.95
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Remove highly correlated features to reduce redundancy.
+        
+        Args:
+            X_train (np.ndarray): Training features.
+            X_test (np.ndarray): Test features.
+            threshold (float): Correlation threshold above which features are removed.
+            
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray]: Filtered X_train, X_test, and kept feature indices.
+        """
+        corr_matrix = np.corrcoef(X_train.T)
+        upper_triangle = np.triu(np.abs(corr_matrix), k=1)
+        
+        # Find features to drop (keep first of each correlated pair)
+        to_drop = set()
+        for i in range(len(upper_triangle)):
+            if i in to_drop:
+                continue
+            for j in range(i + 1, len(upper_triangle)):
+                if upper_triangle[i, j] > threshold:
+                    to_drop.add(j)
+        
+        kept_indices = np.array([i for i in range(X_train.shape[1]) if i not in to_drop])
+        
+        return X_train[:, kept_indices], X_test[:, kept_indices], kept_indices
     
     def _prepare_test_set(
         self, X_test: np.ndarray, y_test: np.ndarray, fold_id: int
