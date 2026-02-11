@@ -16,7 +16,7 @@ if __name__ == "__main__":
             ("damaged_d5.parquet", 1),
         ],
         n_estimators=100,
-        contamination=0.1,
+        contamination="auto",
         max_samples='auto',
         random_state=42
     )
