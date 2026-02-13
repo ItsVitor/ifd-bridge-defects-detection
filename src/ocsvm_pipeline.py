@@ -24,7 +24,11 @@ class OCSVMPipeline(BridgeDefectPipeline):
         file_config: list[tuple[str, int]] | None = None,
         nu: float = 0.1,
         kernel: str = 'rbf',
-        gamma: str | float = 'scale'
+        gamma: str | float = 'scale',
+        filter_type: str = "none",
+        cutoff_low: float = 2,
+        cutoff_high: float = 20,
+        fs: float = 256
     ) -> None:
         """Initialize OCSVM pipeline with hyperparameters.
         
@@ -34,8 +38,12 @@ class OCSVMPipeline(BridgeDefectPipeline):
             nu (float): OCSVM nu parameter.
             kernel (str): Kernel type.
             gamma (str | float): Kernel coefficient.
+            filter_type (str): Signal filter type.
+            cutoff_low (float): Low cutoff frequency in Hz.
+            cutoff_high (float): High cutoff frequency in Hz.
+            fs (float): Sampling frequency in Hz.
         """
-        super().__init__(data_dir, file_config)
+        super().__init__(data_dir, file_config, filter_type, cutoff_low, cutoff_high, fs)
         self.nu = nu
         self.kernel = kernel
         self.gamma = gamma

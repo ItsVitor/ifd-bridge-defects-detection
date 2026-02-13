@@ -27,7 +27,11 @@ class RandomForestPipeline(BridgeDefectPipeline):
         n_estimators: int = 100,
         max_depth: int | None = None,
         min_samples_split: int = 2,
-        random_state: int = 42
+        random_state: int = 42,
+        filter_type: str = "none",
+        cutoff_low: float = 2,
+        cutoff_high: float = 20,
+        fs: float = 256
     ) -> None:
         """Initialize Random Forest pipeline with hyperparameters.
         
@@ -38,8 +42,12 @@ class RandomForestPipeline(BridgeDefectPipeline):
             max_depth (int | None): Maximum depth of trees.
             min_samples_split (int): Minimum samples required to split a node.
             random_state (int): Random seed for reproducibility.
+            filter_type (str): Signal filter type.
+            cutoff_low (float): Low cutoff frequency in Hz.
+            cutoff_high (float): High cutoff frequency in Hz.
+            fs (float): Sampling frequency in Hz.
         """
-        super().__init__(data_dir, file_config)
+        super().__init__(data_dir, file_config, filter_type, cutoff_low, cutoff_high, fs)
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split

@@ -3,7 +3,7 @@
 import os
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,8 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import PredefinedSplit
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
+
+from signal_filters import butter_lowpass_filter, butter_highpass_filter, filter_signal
 
 
 class BridgeDefectPipeline(ABC):
@@ -25,18 +27,31 @@ class BridgeDefectPipeline(ABC):
         data_dir (str): Path to data directory. Defaults to "./data".
         file_config (list[tuple[str, int]] | None): List of (filename, class_label)
             tuples. Defaults to standard 7-file configuration.
+        filter_type (Literal["none", "low", "high", "both"]): Signal filter type.
+            Defaults to "none".
+        cutoff_low (float): Low cutoff frequency in Hz. Defaults to 2.
+        cutoff_high (float): High cutoff frequency in Hz. Defaults to 20.
+        fs (float): Sampling frequency in Hz. Defaults to 256.
     """
 
     def __init__(
         self,
         data_dir: str = "./data",
         file_config: list[tuple[str, int]] | None = None,
+        filter_type: Literal["none", "low", "high", "both"] = "none",
+        cutoff_low: float = 2,
+        cutoff_high: float = 20,
+        fs: float = 256,
     ) -> None:
         """Initialize pipeline with configurable data sources.
         
         Args:
             data_dir (str): Path to data directory.
             file_config (list[tuple[str, int]] | None): List of (filename, class_label).
+            filter_type (Literal["none", "low", "high", "both"]): Signal filter type.
+            cutoff_low (float): Low cutoff frequency in Hz.
+            cutoff_high (float): High cutoff frequency in Hz.
+            fs (float): Sampling frequency in Hz.
         """
         self.data_dir = data_dir
         self.file_config = file_config or [
@@ -48,6 +63,10 @@ class BridgeDefectPipeline(ABC):
             ("damaged_d4.parquet", 1),
             ("damaged_d5.parquet", 1),
         ]
+        self.filter_type = filter_type
+        self.cutoff_low = cutoff_low
+        self.cutoff_high = cutoff_high
+        self.fs = fs
 
     def run(self, feature_df: pd.DataFrame | None = None) -> dict[str, Any]:
         """Execute the complete pipeline.
@@ -143,6 +162,16 @@ class BridgeDefectPipeline(ABC):
                 Each row contains 810 features (18 nodes × 3 axes × 15 features)
                 plus 'Class' and 'Group_ID' metadata columns.
         """
+        # Print filter configuration
+        if self.filter_type == "none":
+            print("Filter: None (no filtering applied)")
+        elif self.filter_type == "low":
+            print(f"Filter: Lowpass (cutoff={self.cutoff_high} Hz, fs={self.fs} Hz)")
+        elif self.filter_type == "high":
+            print(f"Filter: Highpass (cutoff={self.cutoff_low} Hz, fs={self.fs} Hz)")
+        elif self.filter_type == "both":
+            print(f"Filter: Bandpass (cutoff_low={self.cutoff_low} Hz, cutoff_high={self.cutoff_high} Hz, fs={self.fs} Hz)")
+        
         experiments = raw_data.groupby("ExperimentID")
         rows = []
         
@@ -156,6 +185,7 @@ class BridgeDefectPipeline(ABC):
                 # Process each axis for this node
                 for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
                     signal = node_data[axis].values
+                    signal = self._apply_filter(signal)
                     time_features = self._extract_time_features(signal)
                     freq_features = self._extract_freq_features(signal)
                     
@@ -226,6 +256,25 @@ class BridgeDefectPipeline(ABC):
         entropy = stats.entropy(psd_norm + 1e-12, base=2) # Not absolutely sure that I should use base 2 here
         
         return [centroid, spread, skewness, kurtosis, entropy]
+
+    def _apply_filter(self, signal: np.ndarray) -> np.ndarray:
+        """Apply configured filter to signal.
+        
+        Args:
+            signal (np.ndarray): 1D acceleration signal.
+            
+        Returns:
+            np.ndarray: Filtered signal.
+        """
+        if self.filter_type == "none":
+            return signal
+        elif self.filter_type == "low":
+            return butter_lowpass_filter(signal, self.cutoff_high, self.fs)
+        elif self.filter_type == "high":
+            return butter_highpass_filter(signal, self.cutoff_low, self.fs)
+        elif self.filter_type == "both":
+            return filter_signal(signal, self.cutoff_high, self.cutoff_low, self.fs)
+        return signal
 
     def _compute_group_id(self, group: pd.DataFrame) -> int:
         """Compute EOV group ID from experiment metadata.
