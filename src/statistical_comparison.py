@@ -3,6 +3,7 @@
 import numpy as np
 from scipy.stats import wilcoxon
 
+from feature_extractor import extract_features_once
 from ocsvm_pipeline import OCSVMPipeline
 from isolation_forest_pipeline import IsolationForestPipeline
 from random_forest_pipeline import RandomForestPipeline
@@ -42,22 +43,34 @@ if __name__ == "__main__":
     print("STATISTICAL COMPARISON OF MODELS")
     print("=" * 60)
     
+    # Extract features once
+    print("\n[0/3] Extracting features (once for all models)...")
+    feature_df = extract_features_once(
+        filter_type='both',
+        cutoff_low=1,
+        cutoff_high=20,
+        fs=256
+    )
+    print(f"Extracted features: {feature_df.shape}")
+    
     # Run OCSVM
     print("\n[1/3] Running OCSVM...")
-    ocsvm = OCSVMPipeline(nu=0.1, kernel='rbf', gamma='scale')
-    ocsvm_results = ocsvm.run()
+    ocsvm = OCSVMPipeline(nu=0.5, kernel='rbf', gamma='scale')
+    ocsvm_results = ocsvm.run(feature_df=feature_df)
     print(f"OCSVM: {ocsvm_results['mean_accuracy']:.4f} ± {ocsvm_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in ocsvm_results['fold_accuracies']]}")
     
     # Run Isolation Forest
     print("\n[2/3] Running Isolation Forest...")
     iforest = IsolationForestPipeline(
         n_estimators=100, 
-        contamination='auto', 
+        contamination=0.05, 
         max_samples='auto',
         random_state=42
     )
-    iforest_results = iforest.run()
+    iforest_results = iforest.run(feature_df=feature_df)
     print(f"Isolation Forest: {iforest_results['mean_accuracy']:.4f} ± {iforest_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in iforest_results['fold_accuracies']]}")
     
     # Run Random Forest
     print("\n[3/3] Running Random Forest...")
@@ -67,8 +80,9 @@ if __name__ == "__main__":
         min_samples_split=2,
         random_state=42
     )
-    rf_results = rf.run()
+    rf_results = rf.run(feature_df=feature_df)
     print(f"Random Forest: {rf_results['mean_accuracy']:.4f} ± {rf_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in rf_results['fold_accuracies']]}")
     
     # Statistical tests
     print("\n" + "=" * 60)

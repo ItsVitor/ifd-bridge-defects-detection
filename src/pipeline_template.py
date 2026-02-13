@@ -49,15 +49,19 @@ class BridgeDefectPipeline(ABC):
             ("damaged_d5.parquet", 1),
         ]
 
-    def run(self) -> dict[str, Any]:
+    def run(self, feature_df: pd.DataFrame | None = None) -> dict[str, Any]:
         """Execute the complete pipeline.
+        
+        Args:
+            feature_df (pd.DataFrame | None): Pre-extracted features. If None, will extract.
         
         Returns:
             dict[str, Any]: Results containing metrics and statistics.
         """
         # Phase 1: Data Loading and Feature Extraction
-        raw_data = self.load_data()
-        feature_df = self.extract_features(raw_data)
+        if feature_df is None:
+            raw_data = self.load_data()
+            feature_df = self.extract_features(raw_data)
         
         # Phase 2: Cross-Validation Setup
         X = feature_df.drop(columns=['Class', 'Group_ID']).values
