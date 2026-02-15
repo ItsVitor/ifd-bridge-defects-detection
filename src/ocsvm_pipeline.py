@@ -28,7 +28,10 @@ class OCSVMPipeline(BridgeDefectPipeline):
         filter_type: str = "none",
         cutoff_low: float = 2,
         cutoff_high: float = 20,
-        fs: float = 256
+        fs: float = 256,
+        axes_to_use: list[str] | None = None,
+        nodes_to_use: list[int] | None = None,
+
     ) -> None:
         """Initialize OCSVM pipeline with hyperparameters.
         
