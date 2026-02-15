@@ -16,9 +16,12 @@ if __name__ == "__main__":
             ("damaged_d5.parquet", 1),
         ],
         n_estimators=100,
-        contamination="auto",
+        contamination='auto',
         max_samples='auto',
-        random_state=42
+        filter_type="both",
+        cutoff_low=1,
+        cutoff_high=20,
+        nodes_to_use=[10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
     )
     
     print("=" * 60)

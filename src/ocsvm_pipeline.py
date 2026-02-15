@@ -26,7 +26,7 @@ class OCSVMPipeline(BridgeDefectPipeline):
         kernel: str = 'rbf',
         gamma: str | float = 'scale',
         filter_type: str = "none",
-        cutoff_low: float = 2,
+        cutoff_low: float = 1,
         cutoff_high: float = 20,
         fs: float = 256,
         axes_to_use: list[str] | None = None,
@@ -46,7 +46,7 @@ class OCSVMPipeline(BridgeDefectPipeline):
             cutoff_high (float): High cutoff frequency in Hz.
             fs (float): Sampling frequency in Hz.
         """
-        super().__init__(data_dir, file_config, filter_type, cutoff_low, cutoff_high, fs)
+        super().__init__(data_dir, file_config, filter_type, cutoff_low, cutoff_high, fs, axes_to_use, nodes_to_use)
         self.nu = nu
         self.kernel = kernel
         self.gamma = gamma

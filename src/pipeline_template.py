@@ -39,9 +39,11 @@ class BridgeDefectPipeline(ABC):
         data_dir: str = "./data",
         file_config: list[tuple[str, int]] | None = None,
         filter_type: Literal["none", "low", "high", "both"] = "none",
-        cutoff_low: float = 2,
+        cutoff_low: float = 1,
         cutoff_high: float = 20,
         fs: float = 256,
+        axes_to_use: list[str] | None = None,
+        nodes_to_use: list[str] | None = None,
     ) -> None:
         """Initialize pipeline with configurable data sources.
         
@@ -67,6 +69,8 @@ class BridgeDefectPipeline(ABC):
         self.cutoff_low = cutoff_low
         self.cutoff_high = cutoff_high
         self.fs = fs
+        self.axes_to_use = axes_to_use or ["X", "Y", "Z"]
+        self.nodes_to_use = nodes_to_use # None = all
 
     def run(self, feature_df: pd.DataFrame | None = None) -> dict[str, Any]:
         """Execute the complete pipeline.
@@ -179,7 +183,7 @@ class BridgeDefectPipeline(ABC):
             row = {}
 
             # Accelerometer filter
-            node_ids = sorted(exp_group["Node_ID"].unique())
+            node_ids = sorted(exp_group["NodeID"].unique())
             if self.nodes_to_use is not None:
                 node_ids = [n for n in node_ids if n in self.nodes_to_use]
 
@@ -192,7 +196,6 @@ class BridgeDefectPipeline(ABC):
                     axis = f"Accel_{axis_name}"
 
                 # Process each axis for this node
-                for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
                     signal = node_data[axis].values
                     signal = self._apply_filter(signal)
                     time_features = self._extract_time_features(signal)

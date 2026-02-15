@@ -16,8 +16,16 @@ if __name__ == "__main__":
             ("damaged_d5.parquet", 1),
         ],
         nu=0.1,
-        kernel='rbf',
-        gamma='scale'
+        kernel='linear',
+        gamma='scale',
+        filter_type="none",
+        cutoff_low=1,
+        cutoff_high=20,
+        axes_to_use=['X', 'Y'],
+        nodes_to_use=[
+            10654, 10659, 10664, 10669,
+            10658, 10663, 10668, 10673
+        ]
     )
     
     print("=" * 60)
