@@ -185,8 +185,12 @@ class BridgeDefectPipeline(ABC):
 
             # Process each node
             for node_id in node_ids:
-                node_data = exp_group[exp_group["Node_ID"] == node_id]
-                
+                node_data = exp_group[exp_group["NodeID"] == node_id]
+
+                # Direction filter
+                for axis_name in self.axes_to_use:
+                    axis = f"Accel_{axis_name}"
+
                 # Process each axis for this node
                 for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
                     signal = node_data[axis].values
