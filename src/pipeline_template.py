@@ -177,10 +177,15 @@ class BridgeDefectPipeline(ABC):
         
         for exp_id, exp_group in tqdm(experiments, desc="Extracting features"):
             row = {}
-            
+
+            # Accelerometer filter
+            node_ids = sorted(exp_group["Node_ID"].unique())
+            if self.nodes_to_use is not None:
+                node_ids = [n for n in node_ids if n in self.nodes_to_use]
+
             # Process each node
-            for node_id in sorted(exp_group["NodeID"].unique()):
-                node_data = exp_group[exp_group["NodeID"] == node_id]
+            for node_id in node_ids:
+                node_data = exp_group[exp_group["Node_ID"] == node_id]
                 
                 # Process each axis for this node
                 for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
