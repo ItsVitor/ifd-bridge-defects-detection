@@ -10,7 +10,7 @@ import pandas as pd
 from scipy import stats
 from scipy.signal import welch
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.model_selection import PredefinedSplit
+from sklearn.model_selection import PredefinedSplit, train_test_split
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
@@ -36,7 +36,7 @@ class BridgeDefectPipeline(ABC):
 
     def __init__(
         self,
-        data_dir: str = "./data",
+        data_dir: str = "../data",
         file_config: list[tuple[str, int]] | None = None,
         filter_type: Literal["none", "low", "high", "both"] = "none",
         cutoff_low: float = 2,
@@ -87,10 +87,10 @@ class BridgeDefectPipeline(ABC):
         y = feature_df['Class'].values
         groups = feature_df['Group_ID'].values
         
-        cv_splitter = self._create_cv_splitter(groups)
+        splitter = self._create_splitter(groups, splitter_type = 'fold')
         
         fold_results = []
-        for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X, y), start=1):
+        for fold_idx, (train_idx, test_idx) in enumerate(splitter.split(X, y), start=1):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
             groups_train = groups[train_idx]
@@ -136,7 +136,8 @@ class BridgeDefectPipeline(ABC):
         """
         dfs = []
         exp_id_offset = 0
-        
+        filter_nodes = True
+        nodeList = [10664, 10668, 10659, 10663, 10664, 10668, 10669, 10673]
         for filename, class_label in tqdm(self.file_config, desc="Loading data files"):
             df = pd.read_parquet(os.path.join(self.data_dir, filename))
             if "Dano_Percentual" not in df.columns:
@@ -146,7 +147,8 @@ class BridgeDefectPipeline(ABC):
             # Add offset to ExperimentID to ensure uniqueness across files
             df["ExperimentID"] = df["ExperimentID"] + exp_id_offset
             exp_id_offset += df["ExperimentID"].max() + 1
-            
+            if filter_nodes:
+                df = df[df['NodeID'].isin(nodeList)]
             dfs.append(df)
         
         return pd.concat(dfs, ignore_index=True)
@@ -325,7 +327,29 @@ class BridgeDefectPipeline(ABC):
             14: [40, 41, 42],
             15: [43, 44, 45],
         }
-    
+    def _create_splitter(self, groups: np.ndarray, splitter_type: str = 'random') -> PredefinedSplit:
+        if splitter_type == 'random':
+            return self._create_random_splitter(groups)
+        else:
+            return self._create_cv_splitter(groups)
+
+    def _create_random_splitter(self, groups: np.ndarray) -> PredefinedSplit:
+        """Create PredefinedSplit with ramdom split.
+
+        Args:
+            groups (np.ndarray): EOV group IDs for each sample.
+
+        Returns:
+            PredefinedSplit: Random train-test split.
+        """
+        indices = np.arange(len(groups))
+        train_idx, test_idx = train_test_split(indices, test_size=.2)
+
+        test_fold = np.full(len(groups), -1, dtype=int)
+        test_fold[test_idx] = 0
+
+        return PredefinedSplit(test_fold)
+
     def _create_cv_splitter(self, groups: np.ndarray) -> PredefinedSplit:
         """Create PredefinedSplit cross-validator from assignment matrix.
         

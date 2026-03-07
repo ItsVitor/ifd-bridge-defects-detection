@@ -20,7 +20,7 @@ class OCSVMPipeline(BridgeDefectPipeline):
     
     def __init__(
         self,
-        data_dir: str = "./data",
+        data_dir: str = "../data",
         file_config: list[tuple[str, int]] | None = None,
         nu: float = 0.1,
         kernel: str = 'rbf',
