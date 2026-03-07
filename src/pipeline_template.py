@@ -137,7 +137,7 @@ class BridgeDefectPipeline(ABC):
         dfs = []
         exp_id_offset = 0
         filter_nodes = True
-        nodeList = [10664, 10668, 10659, 10663, 10664, 10668, 10669, 10673]
+        nodeList = [10654, 10658, 10659, 10663, 10664, 10668, 10669, 10673]
         for filename, class_label in tqdm(self.file_config, desc="Loading data files"):
             df = pd.read_parquet(os.path.join(self.data_dir, filename))
             if "Dano_Percentual" not in df.columns:
@@ -183,9 +183,9 @@ class BridgeDefectPipeline(ABC):
             # Process each node
             for node_id in sorted(exp_group["NodeID"].unique()):
                 node_data = exp_group[exp_group["NodeID"] == node_id]
-                
+                axes = ["Accel_Y", "Accel_Z"]
                 # Process each axis for this node
-                for axis in ["Accel_X", "Accel_Y", "Accel_Z"]:
+                for axis in axes:
                     signal = node_data[axis].values
                     signal = self._apply_filter(signal)
                     time_features = self._extract_time_features(signal)
