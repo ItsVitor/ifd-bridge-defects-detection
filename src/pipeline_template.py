@@ -183,7 +183,7 @@ class BridgeDefectPipeline(ABC):
             # Process each node
             for node_id in sorted(exp_group["NodeID"].unique()):
                 node_data = exp_group[exp_group["NodeID"] == node_id]
-                axes = ["Accel_Y", "Accel_Z"]
+                axes = ["Accel_Y", "Accel_X"]
                 # Process each axis for this node
                 for axis in axes:
                     signal = node_data[axis].values
