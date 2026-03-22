@@ -28,9 +28,11 @@ class IsolationForestPipeline(BridgeDefectPipeline):
         max_samples: str | int = 'auto',
         random_state: int = 42,
         filter_type: str = "none",
-        cutoff_low: float = 2,
+        cutoff_low: float = 1,
         cutoff_high: float = 20,
-        fs: float = 256
+        fs: float = 256,
+        axes_to_use: list[str] | None = None,
+        nodes_to_use: list[int] | None = None
     ) -> None:
         """Initialize Isolation Forest pipeline with hyperparameters.
         
@@ -46,7 +48,7 @@ class IsolationForestPipeline(BridgeDefectPipeline):
             cutoff_high (float): High cutoff frequency in Hz.
             fs (float): Sampling frequency in Hz.
         """
-        super().__init__(data_dir, file_config, filter_type, cutoff_low, cutoff_high, fs)
+        super().__init__(data_dir, file_config, filter_type, cutoff_low, cutoff_high, fs, axes_to_use, nodes_to_use)
         self.n_estimators = n_estimators
         self.contamination = contamination
         self.max_samples = max_samples
