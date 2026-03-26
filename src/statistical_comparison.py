@@ -39,10 +39,6 @@ def wilcoxon_test(accuracies_a: list[float], accuracies_b: list[float],
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("STATISTICAL COMPARISON OF MODELS")
-    print("=" * 60)
-    
     # Extract features once
     print("\n[0/3] Extracting features (once for all models)...")
     feature_df = extract_features_once(
@@ -55,7 +51,14 @@ if __name__ == "__main__":
     
     # Run OCSVM
     print("\n[1/3] Running OCSVM...")
-    ocsvm = OCSVMPipeline(nu=0.5, kernel='rbf', gamma='scale')
+    ocsvm = OCSVMPipeline(
+        nu=0.5,
+        kernel='rbf',
+        gamma='scale',
+        fold_strategy="random",
+        n_splits=15,
+        random_seed=42
+    )
     ocsvm_results = ocsvm.run(feature_df=feature_df)
     print(f"OCSVM: {ocsvm_results['mean_accuracy']:.4f} ± {ocsvm_results['std_accuracy']:.4f}")
     print(f"Fold accuracies: {[f'{acc:.4f}' for acc in ocsvm_results['fold_accuracies']]}")
@@ -63,10 +66,13 @@ if __name__ == "__main__":
     # Run Isolation Forest
     print("\n[2/3] Running Isolation Forest...")
     iforest = IsolationForestPipeline(
-        n_estimators=100, 
-        contamination=0.05, 
+        n_estimators=100,
+        contamination=0.05,
         max_samples='auto',
-        random_state=42
+        random_state=42,
+        fold_strategy="random",
+        n_splits=15,
+        random_seed=42
     )
     iforest_results = iforest.run(feature_df=feature_df)
     print(f"Isolation Forest: {iforest_results['mean_accuracy']:.4f} ± {iforest_results['std_accuracy']:.4f}")
@@ -78,7 +84,10 @@ if __name__ == "__main__":
         n_estimators=100,
         max_depth=None,
         min_samples_split=2,
-        random_state=42
+        random_state=42,
+        fold_strategy="random",
+        n_splits=15,
+        random_seed=42
     )
     rf_results = rf.run(feature_df=feature_df)
     print(f"Random Forest: {rf_results['mean_accuracy']:.4f} ± {rf_results['std_accuracy']:.4f}")
@@ -119,3 +128,4 @@ if __name__ == "__main__":
     print(f"{'OCSVM':<20} {ocsvm_results['mean_accuracy']:<15.4f} {ocsvm_results['std_accuracy']:<15.4f}")
     print(f"{'Isolation Forest':<20} {iforest_results['mean_accuracy']:<15.4f} {iforest_results['std_accuracy']:<15.4f}")
     print(f"{'Random Forest':<20} {rf_results['mean_accuracy']:<15.4f} {rf_results['std_accuracy']:<15.4f}")
+    print(f"\nFold strategy: {"random"}")

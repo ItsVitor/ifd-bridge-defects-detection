@@ -10,7 +10,7 @@ import pandas as pd
 from scipy import stats
 from scipy.signal import welch
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.model_selection import PredefinedSplit
+from sklearn.model_selection import PredefinedSplit, GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
@@ -44,6 +44,9 @@ class BridgeDefectPipeline(ABC):
         fs: float = 256,
         axes_to_use: list[str] | None = None,
         nodes_to_use: list[str] | None = None,
+        fold_strategy: Literal["predefined", "random"] = "predefined",
+        n_splits: int = 15,
+        random_seed: int | None = None,
     ) -> None:
         """Initialize pipeline with configurable data sources.
         
@@ -54,6 +57,11 @@ class BridgeDefectPipeline(ABC):
             cutoff_low (float): Low cutoff frequency in Hz.
             cutoff_high (float): High cutoff frequency in Hz.
             fs (float): Sampling frequency in Hz.
+            axes_to_use (list[str] | None): Axes to use for feature extraction.
+            nodes_to_use (list[str] | None): Nodes to use for feature extraction.
+            fold_strategy (Literal["predefined", "random"]): CV fold assignment strategy.
+            n_splits (int): Number of splits for random strategy.
+            random_seed (int | None): Random seed for reproducibility.
         """
         self.data_dir = data_dir
         self.file_config = file_config or [
@@ -71,6 +79,9 @@ class BridgeDefectPipeline(ABC):
         self.fs = fs
         self.axes_to_use = axes_to_use or ["X", "Y", "Z"]
         self.nodes_to_use = nodes_to_use # None = all
+        self.fold_strategy = fold_strategy
+        self.n_splits = n_splits
+        self.random_seed = random_seed
 
     def run(self, feature_df: pd.DataFrame | None = None) -> dict[str, Any]:
         """Execute the complete pipeline.
@@ -94,7 +105,7 @@ class BridgeDefectPipeline(ABC):
         cv_splitter = self._create_cv_splitter(groups)
         
         fold_results = []
-        for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X, y), start=1):
+        for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X, y, groups), start=1):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
             groups_train = groups[train_idx]
@@ -338,23 +349,30 @@ class BridgeDefectPipeline(ABC):
             15: [43, 44, 45],
         }
     
-    def _create_cv_splitter(self, groups: np.ndarray) -> PredefinedSplit:
-        """Create PredefinedSplit cross-validator from assignment matrix.
+    def _create_cv_splitter(self, groups: np.ndarray):
+        """Create cross-validator based on fold strategy.
         
         Args:
             groups (np.ndarray): EOV group IDs for each sample.
             
         Returns:
-            PredefinedSplit: Configured cross-validator with 15 folds.
+            PredefinedSplit | GroupShuffleSplit: Configured cross-validator.
         """
-        assignment = self._get_fold_assignment()
-        test_fold = np.full(len(groups), -1, dtype=int)
-        
-        for fold_id, test_groups in assignment.items():
-            mask = np.isin(groups, test_groups)
-            test_fold[mask] = fold_id - 1
-        
-        return PredefinedSplit(test_fold)
+        if self.fold_strategy == "predefined":
+            assignment = self._get_fold_assignment()
+            test_fold = np.full(len(groups), -1, dtype=int)
+            
+            for fold_id, test_groups in assignment.items():
+                mask = np.isin(groups, test_groups)
+                test_fold[mask] = fold_id - 1
+            
+            return PredefinedSplit(test_fold)
+        else:  # random
+            return GroupShuffleSplit(
+                n_splits=self.n_splits,
+                test_size=9/45,
+                random_state=self.random_seed
+            )
     
 
     
