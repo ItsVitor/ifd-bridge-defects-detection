@@ -480,7 +480,7 @@ class BridgeDefectPipeline(ABC):
             y_pred (np.ndarray): Predicted labels.
             
         Returns:
-            dict[str, float]: Metrics dictionary with 'accuracy' key.
+            dict[str, float]: Metrics dictionary with 'accuracy' and 'recall' keys.
         """
         accuracy = (y_true == y_pred).sum() / len(y_true)
         tp = ((y_true == 1) & (y_pred == 1)).sum()
