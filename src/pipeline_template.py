@@ -504,8 +504,12 @@ class BridgeDefectPipeline(ABC):
             dict[str, Any]: Aggregated statistics.
         """
         accuracies = [r["accuracy"] for r in fold_results]
+        recalls = [r['recall'] for r in fold_results]
         return {
             "mean_accuracy": np.mean(accuracies),
             "std_accuracy": np.std(accuracies),
+            "mean_recall": np.mean(recalls),
+            "std_recall": np.std(recalls),
             "fold_accuracies": accuracies,
+            "fold_recalls": recalls,
         }
