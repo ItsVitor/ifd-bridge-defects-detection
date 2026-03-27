@@ -473,7 +473,7 @@ class BridgeDefectPipeline(ABC):
     def evaluate_fold(
         self, y_true: np.ndarray, y_pred: np.ndarray
     ) -> dict[str, float]:
-        """Calculate accuracy for current fold.
+        """Calculate accuracy and recall for current fold.
         
         Args:
             y_true (np.ndarray): True labels.
