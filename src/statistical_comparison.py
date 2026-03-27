@@ -62,6 +62,8 @@ if __name__ == "__main__":
     ocsvm_results = ocsvm.run(feature_df=feature_df)
     print(f"OCSVM: {ocsvm_results['mean_accuracy']:.4f} ± {ocsvm_results['std_accuracy']:.4f}")
     print(f"Fold accuracies: {[f'{acc:.4f}' for acc in ocsvm_results['fold_accuracies']]}")
+    print(f"OCSVM Recall: {ocsvm_results['mean_recall']:.4f} ± {ocsvm_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in ocsvm_results['fold_recalls']]}")
     
     # Run Isolation Forest
     print("\n[2/3] Running Isolation Forest...")
@@ -77,6 +79,8 @@ if __name__ == "__main__":
     iforest_results = iforest.run(feature_df=feature_df)
     print(f"Isolation Forest: {iforest_results['mean_accuracy']:.4f} ± {iforest_results['std_accuracy']:.4f}")
     print(f"Fold accuracies: {[f'{acc:.4f}' for acc in iforest_results['fold_accuracies']]}")
+    print(f"Isolation Forest Recall: {iforest_results['mean_recall']:.4f} ± {iforest_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in iforest_results['fold_recalls']]}")
     
     # Run Random Forest
     print("\n[3/3] Running Random Forest...")
@@ -92,6 +96,8 @@ if __name__ == "__main__":
     rf_results = rf.run(feature_df=feature_df)
     print(f"Random Forest: {rf_results['mean_accuracy']:.4f} ± {rf_results['std_accuracy']:.4f}")
     print(f"Fold accuracies: {[f'{acc:.4f}' for acc in rf_results['fold_accuracies']]}")
+    print(f"Random Forest Recall: {rf_results['mean_recall']:.4f} ± {rf_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in rf_results['fold_recalls']]}")
     
     # Statistical tests
     print("\n" + "=" * 60)
@@ -118,14 +124,42 @@ if __name__ == "__main__":
         "OCSVM",
         "Isolation Forest"
     )
+
+    print("\n" + "=" * 60)
+    print("WILCOXON TESTS (RECALL)")
+    print("=" * 60)
+
+    wilcoxon_test(
+        ocsvm_results['fold_recalls'],
+        rf_results['fold_recalls'],
+        "OCSVM (recall)",
+        "Random Forest (recall)"
+    )
+
+    wilcoxon_test(
+        iforest_results['fold_recalls'],
+        rf_results['fold_recalls'],
+        "Isolation Forest (recall)",
+        "Random Forest (recall)"
+    )
+
+    wilcoxon_test(
+        ocsvm_results['fold_recalls'],
+        iforest_results['fold_recalls'],
+        "OCSVM (recall)",
+        "Isolation Forest (recall)"
+    )
     
     # Summary table
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 72)
     print("SUMMARY")
-    print("=" * 60)
-    print(f"{'Model':<20} {'Mean Accuracy':<15} {'Std Accuracy':<15}")
-    print("-" * 60)
-    print(f"{'OCSVM':<20} {ocsvm_results['mean_accuracy']:<15.4f} {ocsvm_results['std_accuracy']:<15.4f}")
-    print(f"{'Isolation Forest':<20} {iforest_results['mean_accuracy']:<15.4f} {iforest_results['std_accuracy']:<15.4f}")
-    print(f"{'Random Forest':<20} {rf_results['mean_accuracy']:<15.4f} {rf_results['std_accuracy']:<15.4f}")
+    print("=" * 72)
+    print(f"{'Model':<20} {'Mean Acc':<12} {'Std Acc':<12} {'Mean Rec':<12} {'Std Rec':<12}")
+    print("-" * 72)
+    print(
+        f"{'OCSVM':<20} {ocsvm_results['mean_accuracy']:<12.4f} {ocsvm_results['std_accuracy']:<12.4f} {ocsvm_results['mean_recall']:<12.4f} {ocsvm_results['std_recall']:<12.4f}")
+    print(
+        f"{'Isolation Forest':<20} {iforest_results['mean_accuracy']:<12.4f} {iforest_results['std_accuracy']:<12.4f} {iforest_results['mean_recall']:<12.4f} {iforest_results['std_recall']:<12.4f}")
+    print(
+        f"{'Random Forest':<20} {rf_results['mean_accuracy']:<12.4f} {rf_results['std_accuracy']:<12.4f} {rf_results['mean_recall']:<12.4f} {rf_results['std_recall']:<12.4f}")
     print(f"\nFold strategy: {"random"}")
