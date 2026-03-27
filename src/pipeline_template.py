@@ -483,7 +483,14 @@ class BridgeDefectPipeline(ABC):
             dict[str, float]: Metrics dictionary with 'accuracy' key.
         """
         accuracy = (y_true == y_pred).sum() / len(y_true)
-        return {"accuracy": accuracy}
+        tp = ((y_true == 1) & (y_pred == 1)).sum()
+        fn = ((y_true == 1) & (y_pred == 0)).sum()
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+        return {
+            "accuracy": accuracy,
+            "recall": recall
+        }
 
     def aggregate_results(
         self, fold_results: list[dict[str, float]]
