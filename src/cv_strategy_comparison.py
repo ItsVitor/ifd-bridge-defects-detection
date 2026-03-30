@@ -129,3 +129,22 @@ if __name__ == "__main__":
     print(f"Fold accuracies: {[f'{acc:.4f}' for acc in iforest_unbiased_results['fold_accuracies']]}")
     print(f"Isolation Forest Unbiased Recall: {iforest_unbiased_results['mean_recall']:.4f} ± {iforest_unbiased_results['std_recall']:.4f}")
     print(f"Fold recalls: {[f'{r:.4f}' for r in iforest_unbiased_results['fold_recalls']]}")
+
+    # Statistical tests
+    print("\n" + "=" * 60)
+    print("WILCOXON SIGNED-RANK TESTS")
+    print("=" * 60)
+
+    wilcoxon_test(
+        ocsvm_biased_results['fold_accuracies'],
+        ocsvm_unbiased_results['fold_accuracies'],
+        "OCSVM Biased (random)",
+        "OCSVM Unbiased (predefined)"
+    )
+
+    wilcoxon_test(
+        iforest_biased_results['fold_accuracies'],
+        iforest_unbiased_results['fold_accuracies'],
+        "Isolation Forest Biased (random)",
+        "Isolation forest Unbiased (predefined)"
+    )
