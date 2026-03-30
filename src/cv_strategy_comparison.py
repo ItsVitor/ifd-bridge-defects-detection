@@ -87,3 +87,45 @@ if __name__ == "__main__":
     print(f"Fold accuracies: {[f'{acc:.4f}' for acc in ocsvm_unbiased_results['fold_accuracies']]}")
     print(f"OCSVM Unbiased Recall: {ocsvm_unbiased_results['mean_recall']:.4f} ± {ocsvm_unbiased_results['std_recall']:.4f}")
     print(f"Fold recalls: {[f'{r:.4f}' for r in ocsvm_unbiased_results['fold_recalls']]}")
+
+    # Run Isolation Forest Comparison
+    print("\n[2/2] Running Isolation Forest Comparison...")
+    iforest_biased = IsolationForestPipeline(
+        n_estimators=100,
+        contamination='auto',
+        max_samples=512,
+        random_state=42,
+        axes_to_use=['X', 'Y'],
+        nodes_to_use=[
+            10654, 10659, 10664, 10669,
+            10658, 10663, 10668, 10673
+        ],
+        fold_strategy="random",
+        n_splits=15,
+        random_seed=42
+    )
+    iforest_biased_results = iforest_biased.run(feature_df=feature_df)
+    print(f"Isolation Forest Biased: {iforest_biased_results['mean_accuracy']:.4f} ± {iforest_biased_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in iforest_biased_results['fold_accuracies']]}")
+    print(f"Isolation Forest Biased Recall: {iforest_biased_results['mean_recall']:.4f} ± {iforest_biased_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in iforest_biased_results['fold_recalls']]}")
+
+    iforest_unbiased = IsolationForestPipeline(
+        n_estimators=100,
+        contamination='auto',
+        max_samples=512,
+        random_state=42,
+        axes_to_use=['X', 'Y'],
+        nodes_to_use=[
+            10654, 10659, 10664, 10669,
+            10658, 10663, 10668, 10673
+        ],
+        fold_strategy="predefined",
+        n_splits=15,
+        random_seed=42
+    )
+    iforest_unbiased_results = iforest_unbiased.run(feature_df=feature_df)
+    print(f"Isolation Forest Unbiased: {iforest_unbiased_results['mean_accuracy']:.4f} ± {iforest_unbiased_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in iforest_unbiased_results['fold_accuracies']]}")
+    print(f"Isolation Forest Unbiased Recall: {iforest_unbiased_results['mean_recall']:.4f} ± {iforest_unbiased_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in iforest_unbiased_results['fold_recalls']]}")
