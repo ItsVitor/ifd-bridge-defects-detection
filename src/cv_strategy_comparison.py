@@ -162,3 +162,20 @@ if __name__ == "__main__":
         "Isolation Forest Recall Biased (random)",
         "Isolation forest Recall Unbiased (predefined)"
     )
+
+    # Summary table
+    print("\n" + "=" * 72)
+    print("SUMMARY")
+    print("=" * 72)
+    print(f"{'Model':<20} {'Mean Acc':<12} {'Std Acc':<12} {'Mean Rec':<12} {'Std Rec':<12}")
+    print("-" * 72)
+
+    print(
+        f"{'OCSVM biased':<20} {ocsvm_biased_results['mean_accuracy']:<12.4f} {ocsvm_biased_results['std_accuracy']:<12.4f} {ocsvm_biased_results['mean_recall']:<12.4f} {ocsvm_biased_results['std_recall']:<12.4f}")
+    print(
+        f"{'OCSVM unbiased':<20} {ocsvm_unbiased_results['mean_accuracy']:<12.4f} {ocsvm_unbiased_results['std_accuracy']:<12.4f} {ocsvm_unbiased_results['mean_recall']:<12.4f} {ocsvm_unbiased_results['std_recall']:<12.4f}")
+
+    print(
+        f"{'iForest biased':<20} {iforest_biased_results['mean_accuracy']:<12.4f} {iforest_biased_results['std_accuracy']:<12.4f} {iforest_biased_results['mean_recall']:<12.4f} {iforest_biased_results['std_recall']:<12.4f}")
+    print(
+        f"{'iForest unbiased':<20} {iforest_unbiased_results['mean_accuracy']:<12.4f} {iforest_unbiased_results['std_accuracy']:<12.4f} {iforest_unbiased_results['mean_recall']:<12.4f} {iforest_unbiased_results['std_recall']:<12.4f}")
