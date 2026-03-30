@@ -47,3 +47,43 @@ if __name__ == "__main__":
         fs=256
     )
     print(f"Extracted features: {feature_df.shape}")
+
+    # Run OCSVM
+    print("\n[1/2] Running OCSVM comparison...")
+    ocsvm_biased = OCSVMPipeline(
+        nu=0.1,
+        kernel='linear',
+        gamma='scale',
+        axes_to_use=['X', 'Y'],
+        nodes_to_use=[
+            10654, 10659, 10664, 10669,
+            10658, 10663, 10668, 10673
+        ],
+        fold_strategy="random",
+        n_splits=15,
+        random_seed=42
+    )
+    ocsvm_biased_results = ocsvm_biased.run(feature_df=feature_df)
+    print(f"OCSVM Biased: {ocsvm_biased_results['mean_accuracy']:.4f} ± {ocsvm_biased_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in ocsvm_biased_results['fold_accuracies']]}")
+    print(f"OCSVM Biased Recall: {ocsvm_biased_results['mean_recall']:.4f} ± {ocsvm_biased_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in ocsvm_biased_results['fold_recalls']]}")
+
+    ocsvm_unbiased = OCSVMPipeline(
+        nu=0.1,
+        kernel='linear',
+        gamma='scale',
+        axes_to_use=['X', 'Y'],
+        nodes_to_use=[
+            10654, 10659, 10664, 10669,
+            10658, 10663, 10668, 10673
+        ],
+        fold_strategy="predefined",
+        n_splits=15,
+        random_seed=42
+    )
+    ocsvm_unbiased_results = ocsvm_unbiased.run(feature_df=feature_df)
+    print(f"OCSVM Unbiased: {ocsvm_unbiased_results['mean_accuracy']:.4f} ± {ocsvm_unbiased_results['std_accuracy']:.4f}")
+    print(f"Fold accuracies: {[f'{acc:.4f}' for acc in ocsvm_unbiased_results['fold_accuracies']]}")
+    print(f"OCSVM Unbiased Recall: {ocsvm_unbiased_results['mean_recall']:.4f} ± {ocsvm_unbiased_results['std_recall']:.4f}")
+    print(f"Fold recalls: {[f'{r:.4f}' for r in ocsvm_unbiased_results['fold_recalls']]}")
