@@ -148,3 +148,17 @@ if __name__ == "__main__":
         "Isolation Forest Biased (random)",
         "Isolation forest Unbiased (predefined)"
     )
+
+    wilcoxon_test(
+        ocsvm_biased_results['fold_recalls'],
+        ocsvm_unbiased_results['fold_recalls'],
+        "OCSVM Recall Biased (random)",
+        "OCSVM Recall Unbiased (predefined)"
+    )
+
+    wilcoxon_test(
+        iforest_biased_results['fold_recalls'],
+        iforest_unbiased_results['fold_recalls'],
+        "Isolation Forest Recall Biased (random)",
+        "Isolation forest Recall Unbiased (predefined)"
+    )
