@@ -10,7 +10,9 @@ def extract_features_once(
     filter_type: str = "none",
     cutoff_low: float = 2,
     cutoff_high: float = 20,
-    fs: float = 256
+    fs: float = 256,
+    axes_to_use: list[str] | None = None,
+    nodes_to_use: list[int] | None = None,
 ) -> pd.DataFrame:
     """Extract features once and reuse across multiple pipelines.
     
@@ -32,7 +34,9 @@ def extract_features_once(
         filter_type=filter_type,
         cutoff_low=cutoff_low,
         cutoff_high=cutoff_high,
-        fs=fs
+        fs=fs,
+        axes_to_use=axes_to_use,
+        nodes_to_use=nodes_to_use
     )
     
     # Extract features

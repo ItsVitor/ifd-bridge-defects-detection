@@ -42,22 +42,24 @@ if __name__ == "__main__":
     # Extract features once
     print("\n[0/3] Extracting features (once for all models)...")
     feature_df = extract_features_once(
-        filter_type='both',
+        filter_type='none',
         cutoff_low=1,
         cutoff_high=20,
-        fs=256
+        fs=256,
+        axes_to_use=["X", "Y"],
+        nodes_to_use=[10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673],
     )
     print(f"Extracted features: {feature_df.shape}")
     
     # Run OCSVM
     print("\n[1/3] Running OCSVM...")
     ocsvm = OCSVMPipeline(
-        nu=0.5,
-        kernel='rbf',
-        gamma='scale',
-        fold_strategy="random",
+        nu=0.1,
+        kernel="linear",
+        gamma="scale",
+        fold_strategy="predefined",
         n_splits=15,
-        random_seed=42
+        random_seed=42,
     )
     ocsvm_results = ocsvm.run(feature_df=feature_df)
     print(f"OCSVM: {ocsvm_results['mean_accuracy']:.4f} ± {ocsvm_results['std_accuracy']:.4f}")
@@ -69,12 +71,12 @@ if __name__ == "__main__":
     print("\n[2/3] Running Isolation Forest...")
     iforest = IsolationForestPipeline(
         n_estimators=100,
-        contamination=0.05,
-        max_samples='auto',
+        contamination='auto',
+        max_samples=512,
         random_state=42,
-        fold_strategy="random",
+        fold_strategy="predefined",
         n_splits=15,
-        random_seed=42
+        random_seed=42,
     )
     iforest_results = iforest.run(feature_df=feature_df)
     print(f"Isolation Forest: {iforest_results['mean_accuracy']:.4f} ± {iforest_results['std_accuracy']:.4f}")
@@ -89,9 +91,9 @@ if __name__ == "__main__":
         max_depth=None,
         min_samples_split=2,
         random_state=42,
-        fold_strategy="random",
+        fold_strategy="predefined",
         n_splits=15,
-        random_seed=42
+        random_seed=42,
     )
     rf_results = rf.run(feature_df=feature_df)
     print(f"Random Forest: {rf_results['mean_accuracy']:.4f} ± {rf_results['std_accuracy']:.4f}")
@@ -162,4 +164,3 @@ if __name__ == "__main__":
         f"{'Isolation Forest':<20} {iforest_results['mean_accuracy']:<12.4f} {iforest_results['std_accuracy']:<12.4f} {iforest_results['mean_recall']:<12.4f} {iforest_results['std_recall']:<12.4f}")
     print(
         f"{'Random Forest':<20} {rf_results['mean_accuracy']:<12.4f} {rf_results['std_accuracy']:<12.4f} {rf_results['mean_recall']:<12.4f} {rf_results['std_recall']:<12.4f}")
-    print(f"\nFold strategy: {"random"}")
