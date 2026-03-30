@@ -36,3 +36,14 @@ def wilcoxon_test(accuracies_a: list[float], accuracies_b: list[float],
             print(f"  Result: {name_b} is significantly BETTER (p < 0.05)")
     else:
         print(f"  Result: No significant difference (p >= 0.05)")
+
+if __name__ == "__main__":
+    # Extract features once
+    print("\n[0/3] Extracting features (once for all models)...")
+    feature_df = extract_features_once(
+        filter_type='none',
+        cutoff_low=1,
+        cutoff_high=20,
+        fs=256
+    )
+    print(f"Extracted features: {feature_df.shape}")
