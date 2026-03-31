@@ -17,10 +17,11 @@ if __name__ == "__main__":
         ],
         n_estimators=100,
         contamination='auto',
-        max_samples='auto',
-        filter_type="both",
+        max_samples=512,
+        filter_type="none",
         cutoff_low=1,
         cutoff_high=20,
+        axes_to_use=["X", "Y"],
         nodes_to_use=[10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
     )
     

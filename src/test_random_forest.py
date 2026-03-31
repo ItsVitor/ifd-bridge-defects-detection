@@ -18,7 +18,10 @@ if __name__ == "__main__":
         n_estimators=100,
         max_depth=None,
         min_samples_split=2,
-        random_state=42
+        filter_type='none',
+        random_state=42,
+        axes_to_use=['X', 'Y'],
+        nodes_to_use=[10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673],
     )
     
     print("=" * 60)
