@@ -128,6 +128,23 @@ class BridgeDefectPipeline(ABC):
         
         return self.aggregate_results(fold_results)
 
+    def evaluate_by_damage(self, model, feature_df) -> dict(float, float):
+        raw_data = self.load_data()
+        damaged_data = raw_data[raw_data["Dano_Percentual"] != 0.0]
+        damage_values = raw_data["Dano_Percentual"].unique()
+        metrics_by_damage = []
+        for dmg in damage_values:
+            exp_ids = raw_data[raw_data["Dano_Percentual"] == dmg]
+            filtered_features = feature_df[feature_df["Group_ID"].isin(exp_ids)]
+            X = filtered_features.drop(columns=['Class', 'Group_ID']).values
+            y = filtered_features['Class'].values
+            groups = filtered_features['Group_ID'].values
+            #passar para model, extrair y_test,y_pred
+            metrics = self.evaluate_fold(y_test, y_pred)
+            metrics_by_damage[dmg] = metrics
+
+        return metrics_by_damage
+
     def load_data(self) -> pd.DataFrame:
         """Load and concatenate all Parquet files.
         
