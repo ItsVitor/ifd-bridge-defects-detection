@@ -83,7 +83,7 @@ class BridgeDefectPipeline(ABC):
         self.n_splits = n_splits
         self.random_seed = random_seed
 
-    def run(self, feature_df: pd.DataFrame | None = None) -> dict[str, Any]:
+    def run(self, feature_df: pd.DataFrame | None = None, damage_levels=None) -> dict[str, Any]:
         """Execute the complete pipeline.
         
         Args:
@@ -92,6 +92,7 @@ class BridgeDefectPipeline(ABC):
         Returns:
             dict[str, Any]: Results containing metrics and statistics.
         """
+        raw_data = None
         # Phase 1: Data Loading and Feature Extraction
         if feature_df is None:
             raw_data = self.load_data()
@@ -101,10 +102,16 @@ class BridgeDefectPipeline(ABC):
         X = feature_df.drop(columns=['Class', 'Group_ID']).values
         y = feature_df['Class'].values
         groups = feature_df['Group_ID'].values
-        
+
+        damage_levels= raw_data.groupby("ExperimentID")['Dano_Percentual'].first() if raw_data is not None else 0
+
         cv_splitter = self._create_cv_splitter(groups)
         
         fold_results = []
+        all_y_true = []
+        all_y_pred = []
+        all_indices = []
+
         for fold_idx, (train_idx, test_idx) in enumerate(cv_splitter.split(X, y, groups), start=1):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
@@ -136,10 +143,21 @@ class BridgeDefectPipeline(ABC):
             # Convert OCSVM output: 1 (inlier) → 0 (healthy), -1 (outlier) → 1 (damaged)
             if np.any(y_pred == -1):
                 y_pred = np.where(y_pred == 1, 0, 1)
+
+            all_y_true.extend(y_test)
+            all_y_pred.extend(y_pred)
+            all_indices.extend(test_idx)
             
             # Phase 4: Evaluation
             metrics = self.evaluate_fold(y_test, y_pred)
             fold_results.append(metrics)
+
+        self._cv_predictions = {
+            "y_true": np.array(all_y_true),
+            "y_pred": np.array(all_y_pred),
+            "indices": np.array(all_indices),
+            "damage_levels": np.array(damage_levels.iloc[all_indices])
+        }
         
         return self.aggregate_results(fold_results)
 

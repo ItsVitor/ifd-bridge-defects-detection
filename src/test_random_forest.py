@@ -45,3 +45,30 @@ if __name__ == "__main__":
     print(f"\nFold Recalls:")
     for i, recall in enumerate(results['fold_recalls'], 1):
         print(f"  Fold {i:2d}: {recall:.4f}")
+
+    preds = pipeline._cv_predictions
+
+    y_true = preds["y_true"]
+    y_pred = preds["y_pred"]
+    damage_levels = preds["damage_levels"]
+
+    print("\n" + "=" * 60)
+    print("PERFORMANCE BY DAMAGE PERCENTAGE")
+    print("=" * 60)
+
+    for dmg in sorted(set(damage_levels[y_true == 1])):
+        mask = damage_levels == dmg
+
+        y_true_d = y_true[mask]
+        y_pred_d = y_pred[mask]
+
+        accuracy = (y_true_d == y_pred_d).mean()
+
+        tp = ((y_true_d == 1) & (y_pred_d == 1)).sum()
+        fn = ((y_true_d == 1) & (y_pred_d == 0)).sum()
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+        print(f"\nDamage: {dmg:.2f}%")
+        print(f"  Accuracy: {accuracy:.4f}")
+        print(f"  Recall:   {recall:.4f}")
+        print(f"  Samples:  {len(y_true_d)}")
