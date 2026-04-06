@@ -37,6 +37,11 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"\nMean Accuracy: {results['mean_accuracy']:.4f}")
     print(f"Std Accuracy: {results['std_accuracy']:.4f}")
+    print(f"\nMean Recall: {results['mean_recall']:.4f}")
+    print(f"Std Recall: {results['std_recall']:.4f}")
     print(f"\nFold Accuracies:")
     for i, acc in enumerate(results['fold_accuracies'], 1):
         print(f"  Fold {i:2d}: {acc:.4f}")
+    print(f"\nFold Recalls:")
+    for i, recall in enumerate(results['fold_recalls'], 1):
+        print(f"  Fold {i:2d}: {recall:.4f}")
