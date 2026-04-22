@@ -92,10 +92,10 @@ class BridgeDefectPipeline(ABC):
         Returns:
             dict[str, Any]: Results containing metrics and statistics.
         """
-        raw_data = None
+        raw_data = self.load_data()
+
         # Phase 1: Data Loading and Feature Extraction
         if feature_df is None:
-            raw_data = self.load_data()
             feature_df = self.extract_features(raw_data)
         
         # Phase 2: Cross-Validation Setup
