@@ -32,7 +32,7 @@ if __name__ == "__main__":
     
     print("\nRunning full pipeline...")
     results = pipeline.run()
-    
+
     print("\n" + "=" * 60)
     print("RESULTS")
     print("=" * 60)
@@ -40,6 +40,10 @@ if __name__ == "__main__":
     print(f"Std Accuracy: {results['std_accuracy']:.4f}")
     print(f"\nMean Recall: {results['mean_recall']:.4f}")
     print(f"Std Recall: {results['std_recall']:.4f}")
+    tn, fp, fn, tp = results["confusion_matrix"].ravel()
+    print("\nConfusion Matrix:")
+    print(f"TN: {tn}  FP: {fp}")
+    print(f"FN: {fn}  TP: {tp}")
     print(f"\nFold Accuracies:")
     for i, acc in enumerate(results['fold_accuracies'], 1):
         print(f"  Fold {i:2d}: {acc:.4f}")

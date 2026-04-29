@@ -10,6 +10,7 @@ import pandas as pd
 from scipy import stats
 from scipy.signal import welch
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import PredefinedSplit, GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
@@ -522,6 +523,12 @@ class BridgeDefectPipeline(ABC):
         """
         accuracies = [r["accuracy"] for r in fold_results]
         recalls = [r['recall'] for r in fold_results]
+
+        y_true = self._cv_predictions["y_true"]
+        y_pred = self._cv_predictions["y_pred"]
+
+        cm = confusion_matrix(y_true, y_pred)
+
         return {
             "mean_accuracy": np.mean(accuracies),
             "std_accuracy": np.std(accuracies),
@@ -529,4 +536,5 @@ class BridgeDefectPipeline(ABC):
             "std_recall": np.std(recalls),
             "fold_accuracies": accuracies,
             "fold_recalls": recalls,
+            "confusion_matrix": cm
         }
