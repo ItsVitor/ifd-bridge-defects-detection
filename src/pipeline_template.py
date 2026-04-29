@@ -232,7 +232,6 @@ class BridgeDefectPipeline(ABC):
                     
                     axis_name = axis.split('_')[1]  # 'X', 'Y', or 'Z'
                     feature_names = [
-                        f"{axis_name}_N{node_id}_mean", f"{axis_name}_N{node_id}_var",
                         f"{axis_name}_N{node_id}_kurt", f"{axis_name}_N{node_id}_rms",
                         f"{axis_name}_N{node_id}_peak_to_rms", f"{axis_name}_N{node_id}_rss",
                         f"{axis_name}_N{node_id}_peak_to_peak", f"{axis_name}_N{node_id}_min",
@@ -274,7 +273,7 @@ class BridgeDefectPipeline(ABC):
         maximum = np.max(signal)
         jerk = np.mean(np.abs(np.diff(signal)))
         
-        return [mean, variance, kurtosis, rms, peak_to_rms, rss, 
+        return [variance, kurtosis, rms, peak_to_rms, rss,
                 peak_to_peak, minimum, maximum, jerk]
 
     def _extract_freq_features(self, signal: np.ndarray, fs: float = 256.0) -> list[float]:
