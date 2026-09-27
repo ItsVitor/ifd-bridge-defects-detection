@@ -2,18 +2,17 @@
 
 from random_forest_pipeline import RandomForestPipeline
 
-
 if __name__ == "__main__":
     # Initialize pipeline with literature-based hyperparameters
     pipeline = RandomForestPipeline(
         file_config=[
-            ("healthy.parquet", 0),
-            ("slightly_damaged.parquet", 0),
-            ("damaged_d1.parquet", 1),
-            ("damaged_d2.parquet", 1),
-            ("damaged_d3.parquet", 1),
-            ("damaged_d4.parquet", 1),
-            ("damaged_d5.parquet", 1),
+            ("v2/healthy.parquet", 0),
+            ("v2/slightly_damaged.parquet", 0),
+            ("v2/damaged_d1.parquet", 1),
+            ("v2/damaged_d2.parquet", 1),
+            ("v2/damaged_d3.parquet", 1),
+            ("v2/damaged_d4.parquet", 1),
+            ("v2/damaged_d5.parquet", 1),
         ],
         n_estimators=100,
         max_depth=None,
