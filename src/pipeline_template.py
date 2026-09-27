@@ -21,8 +21,8 @@ from signal_filters import butter_lowpass_filter, butter_highpass_filter, filter
 class BridgeDefectPipeline(ABC):
     """Template for 15-fold group cross-validation pipeline.
     
-    Implements the 4-phase workflow: feature extraction, CV strategy,
-    model training, and evaluation.
+    Implements the 4-phase workflow specified in *docs\\pipeline.md*: 
+    feature extraction, CV strategy, model training, and evaluation.
     
     Args:
         data_dir (str): Path to data directory. Defaults to "./data".
