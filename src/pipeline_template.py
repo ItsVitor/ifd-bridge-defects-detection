@@ -5,6 +5,8 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
+import yaml
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -25,45 +27,20 @@ class BridgeDefectPipeline(ABC):
     feature extraction, CV strategy, model training, and evaluation.
     
     Args:
+        config_path (str): Path to YAML configuration file.
         data_dir (str): Path to data directory. Defaults to "./data".
-        file_config (list[tuple[str, int]] | None): List of (filename, class_label)
-            tuples. Defaults to standard 7-file configuration.
-        filter_type (Literal["none", "low", "high", "both"]): Signal filter type.
-            Defaults to "none".
-        cutoff_low (float): Low cutoff frequency in Hz. Defaults to 2.
-        cutoff_high (float): High cutoff frequency in Hz. Defaults to 20.
-        fs (float): Sampling frequency in Hz. Defaults to 256.
+        file_config (list[tuple[str, int]] | None): List of (filename, class_label) tuples.
+        random_seed (int | None): Random seed for reproducibility.
     """
 
     def __init__(
         self,
+        config_path: str,
         data_dir: str = "./data",
         file_config: list[tuple[str, int]] | None = None,
-        filter_type: Literal["none", "low", "high", "both"] = "none",
-        cutoff_low: float = 1,
-        cutoff_high: float = 20,
-        fs: float = 256,
-        axes_to_use: list[str] | None = None,
-        nodes_to_use: list[str] | None = None,
-        fold_strategy: Literal["predefined", "random"] = "predefined",
-        n_splits: int = 15,
         random_seed: int | None = None,
     ) -> None:
-        """Initialize pipeline with configurable data sources.
-        
-        Args:
-            data_dir (str): Path to data directory.
-            file_config (list[tuple[str, int]] | None): List of (filename, class_label).
-            filter_type (Literal["none", "low", "high", "both"]): Signal filter type.
-            cutoff_low (float): Low cutoff frequency in Hz.
-            cutoff_high (float): High cutoff frequency in Hz.
-            fs (float): Sampling frequency in Hz.
-            axes_to_use (list[str] | None): Axes to use for feature extraction.
-            nodes_to_use (list[str] | None): Nodes to use for feature extraction.
-            fold_strategy (Literal["predefined", "random"]): CV fold assignment strategy.
-            n_splits (int): Number of splits for random strategy.
-            random_seed (int | None): Random seed for reproducibility.
-        """
+        cfg = self._load_config(config_path)["pipeline"]
         self.data_dir = data_dir
         self.file_config = file_config or [
             ("healthy.parquet", 0),
@@ -74,15 +51,20 @@ class BridgeDefectPipeline(ABC):
             ("damaged_d4.parquet", 1),
             ("damaged_d5.parquet", 1),
         ]
-        self.filter_type = filter_type
-        self.cutoff_low = cutoff_low
-        self.cutoff_high = cutoff_high
-        self.fs = fs
-        self.axes_to_use = axes_to_use or ["X", "Y", "Z"]
-        self.nodes_to_use = nodes_to_use # None = all
-        self.fold_strategy = fold_strategy
-        self.n_splits = n_splits
+        self.filter_type = cfg["filter_type"]
+        self.cutoff_low = cfg["cutoff_low"]
+        self.cutoff_high = cfg["cutoff_high"]
+        self.fs = cfg["sampling_frequency"]
+        self.axes_to_use = cfg.get("axes_to_use") or ["X", "Y", "Z"]
+        self.nodes_to_use = cfg.get("nodes_to_use")  # None = all
+        self.fold_strategy = cfg["fold_strategy"]
+        self.n_splits = cfg["n_splits"]
         self.random_seed = random_seed
+
+    @staticmethod
+    def _load_config(config_path: str) -> dict:
+        with open(config_path) as f:
+            return yaml.safe_load(f)
 
     def run(self, feature_df: pd.DataFrame | None = None, damage_levels=None) -> dict[str, Any]:
         """Execute the complete pipeline.

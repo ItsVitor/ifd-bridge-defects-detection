@@ -1,11 +1,15 @@
 """Test script for Isolation Forest pipeline."""
 
+import os
+
 from isolation_forest_pipeline import IsolationForestPipeline
 
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "isolation_forest.yaml")
 
 if __name__ == "__main__":
-    # Initialize pipeline with literature-based hyperparameters
     pipeline = IsolationForestPipeline(
+        config_path=CONFIG_PATH,
+        data_dir=os.path.join(".", "data"),
         file_config=[
             ("healthy.parquet", 0),
             ("slightly_damaged.parquet", 0),
@@ -15,14 +19,6 @@ if __name__ == "__main__":
             ("damaged_d4.parquet", 1),
             ("damaged_d5.parquet", 1),
         ],
-        n_estimators=100,
-        contamination='auto',
-        max_samples=512,
-        filter_type="none",
-        cutoff_low=1,
-        cutoff_high=20,
-        axes_to_use=["X", "Y"],
-        nodes_to_use=[10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
     )
     
     print("=" * 60)

@@ -1,26 +1,24 @@
 """Test script for Random Forest pipeline."""
 
+import os
+
 from random_forest_pipeline import RandomForestPipeline
 
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "random_forest.yaml")
+
 if __name__ == "__main__":
-    # Initialize pipeline with literature-based hyperparameters
     pipeline = RandomForestPipeline(
+        config_path=CONFIG_PATH,
+        data_dir=os.path.join(".", "data"),
         file_config=[
-            ("v2/healthy.parquet", 0),
-            ("v2/slightly_damaged.parquet", 0),
-            ("v2/damaged_d1.parquet", 1),
-            ("v2/damaged_d2.parquet", 1),
-            ("v2/damaged_d3.parquet", 1),
-            ("v2/damaged_d4.parquet", 1),
-            ("v2/damaged_d5.parquet", 1),
+            (os.path.join("v2", "v2_healthy.parquet"), 0),
+            (os.path.join("v2", "v2_slightly_damaged.parquet"), 0),
+            (os.path.join("v2", "v2_damaged_d1.parquet"), 1),
+            (os.path.join("v2", "v2_damaged_d2.parquet"), 1),
+            (os.path.join("v2", "v2_damaged_d3.parquet"), 1),
+            (os.path.join("v2", "v2_damaged_d4.parquet"), 1),
+            (os.path.join("v2", "v2_damaged_d5.parquet"), 1)
         ],
-        n_estimators=100,
-        max_depth=None,
-        min_samples_split=2,
-        filter_type='none',
-        random_state=42,
-        axes_to_use=['X', 'Y'],
-        nodes_to_use=[10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673],
     )
     
     print("=" * 60)

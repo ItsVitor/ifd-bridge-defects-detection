@@ -1,0 +1,14 @@
+pipeline:
+  filter_type: "none"
+  cutoff_low: 1
+  cutoff_high: 20
+  sampling_frequency: 256
+  axes_to_use: ["X", "Y"]
+  nodes_to_use: [10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
+  fold_strategy: "predefined"
+  n_splits: 15
+
+model:
+  n_estimators: 100
+  contamination: "auto"
+  max_samples: 512
