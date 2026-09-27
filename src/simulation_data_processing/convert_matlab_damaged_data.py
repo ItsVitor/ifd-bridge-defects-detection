@@ -38,6 +38,10 @@ for i in tqdm(range(num_experimentos), desc="Experimentos"):
     dano_percentual = data["Dano_Percentual"][i] / 100
 
     matriz_x = np.array(data['Accel_X'][i])
+    
+    if all(x is None for x in matriz_x.flat) is True:
+        continue
+    
     matriz_y = np.array(data['Accel_Y'][i])
     matriz_z = np.array(data['Accel_Z'][i])
     
