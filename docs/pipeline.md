@@ -4,6 +4,8 @@
 
 ## 1. Feature Extraction (Preprocessing Phase)
 
+Not every pipeline will have the feature extraction step during it's preprocessing phase, since there are models which utilize the raw input and does automatic feature extraction during their execution.
+
 **Feature Extraction Scope:** Features (RMS, Kurtosis, etc.) must be calculated per sensor `NodeID` (18 sensors per Experiment).
 
 **Normalization Rule:**
