@@ -159,9 +159,11 @@ class BridgeDefectPipeline(ABC):
                 df["Dano_Percentual"] = 0.0
             df["Class"] = class_label
             
+            
+            
             # Add offset to ExperimentID to ensure uniqueness across files
             df["ExperimentID"] = df["ExperimentID"] + exp_id_offset
-            exp_id_offset += df["ExperimentID"].max() + 1
+            exp_id_offset = df["ExperimentID"].max() + 1
             
             dfs.append(df)
         
