@@ -1,8 +1,12 @@
 # Experimental Pipeline Specification
 
-**Single Sample:** A unique `ExperimentID`.
+## 1. Data Loading
 
-## 1. Feature Extraction (Preprocessing Phase)
+- Iterate through all 7 Parquet files defined in `data.md`:
+  - **Grouping:** Process data per **Sample** (defined as a unique `ExperimentID`).
+- Consolidate everything into a single dataframe.
+
+## 2. Feature Extraction (Preprocessing Phase)
 
 Not every pipeline will have the feature extraction step during it's preprocessing phase, since there are models which utilize the raw input and does automatic feature extraction during their execution.
 
@@ -15,15 +19,12 @@ Not every pipeline will have the feature extraction step during it's preprocessi
 
 **Objective:** Transform raw time-series data into a structured feature matrix $X$.
 
-1. **Data Loading:**
-    - Iterate through all 7 Parquet files defined in `data.md`.
-    - **Grouping:** Process data per **Sample** (defined as a unique `ExperimentID`).
-2. **Calculation:**
+1. **Calculation:**
     - For each Sample (experiment), process all 18 sensor nodes.
     - For each node, process all 3 axes (`Accel_X`, `Accel_Y`, `Accel_Z`) independently.
     - **Time-Domain Features (per axis per node):** Calculate Mean, Covariance (Variance), Kurtosis, RMS, Peak-to-RMS, RSS, Peak-to-Peak, Minimum, Maximum, and Feature-jerk.
     - **Frequency-Domain Features (per axis per node):** Calculate PSD (using $f_s=256$ Hz), then extract Spectral Centroid, Spread, Skewness, Kurtosis, and Entropy.
-3. **Output Structure:**
+2. **Output Structure:**
     - Create a Master Feature Matrix where:
       - **Rows** = Experiments (one row per ExperimentID)
       - **Columns** = 810 features (18 nodes $\times$ 3 axes $\times$ 15 features)
@@ -32,7 +33,7 @@ Not every pipeline will have the feature extraction step during it's preprocessi
 
 ---
 
-## 2. Experimental Strategy (The Outer Loop)
+## 3. Experimental Strategy (The Outer Loop)
 
 **Objective:** Perform 10-Fold Group Cross-Validation to evaluate model performance.
 
@@ -45,20 +46,20 @@ Dataset contains 45 EOV groups (combinations of speed, mass, elasticity), this i
 
 Each fold's test set uses unique EOV groups not seen in training.
 
-### Step 2.1: Data Partitioning
+### Step 3.1: Data Partitioning
 
 1. **Test Set:** Select all samples belonging to the EOV groups assigned to the current `Fold_ID`.
 2. **Training Set:** Select all samples belonging to the remaining EOV groups.
 3. **Strict Balancing:** Ensure the Test Set has exactly a 1:1 ratio of Healthy to Damaged samples (downsample the majority class if necessary).
 
-### Step 2.2: Feature Filtering
+### Step 3.2: Feature Filtering
 
 1. **Variance Threshold Filter**: Remove features with zero or near-zero variance.
 2. **Correlation Filter**: Remove highly correlated features (threshold=0.95) to reduce redundancy.
 3. **Fit** both filters using **only** the Training Data.
 4. **Transform** both Training and Test Data using the fitted filters.
 
-### Step 2.3: Data Normalization (Anti-Leakage)
+### Step 3.3: Data Normalization (Anti-Leakage)
 
 1. Initialize a `StandardScaler`.
 2. **Fit** the scaler using **only** the Training Data.
@@ -67,7 +68,7 @@ Each fold's test set uses unique EOV groups not seen in training.
 
 ---
 
-## 3. Model Training
+## 4. Model Training
 
 **Objective:** Train models with literature-based hyperparameters.
 
@@ -89,7 +90,7 @@ Each fold's test set uses unique EOV groups not seen in training.
 
 ---
 
-## 4. Evaluation (Post-Processing)
+## 5. Evaluation (Post-Processing)
 
 **Objective:** Assess accuracy metrics and statistical significance of the results.
 
