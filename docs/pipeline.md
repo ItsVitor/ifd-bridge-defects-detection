@@ -6,16 +6,17 @@
   - **Grouping:** Process data per **Sample** (defined as a unique `ExperimentID`).
 - Consolidate everything into a single dataframe.
 
-## 2. Feature Extraction (Preprocessing Phase)
+## Preprocessing Phase
 
-Not every pipeline will have the feature extraction step during it's preprocessing phase, since there are models which utilize the raw input and does automatic feature extraction during their execution.
+### 2. Feature Extraction
+
+**Note:** Not every pipeline will have the feature extraction step during it's preprocessing phase, since there are models which utilize the raw input and does automatic feature extraction during their execution, such as autoencoders.
 
 **Feature Extraction Scope:** Features (RMS, Kurtosis, etc.) must be calculated per sensor `NodeID` (18 sensors per Experiment).
 
 **Normalization Rule:**
 
 - **Do NOT scale** the raw `Accel_` columns (this preserves physical amplitude differences) (although I would think that since the acceleration measures already come normalized from -1 to 1, this specification might not be necessary).
-- **DO scale** the *Extracted Feature Matrix* (e.g., StandardScaler) inside the cross-validation loop.
 
 **Objective:** Transform raw time-series data into a structured feature matrix $X$.
 
@@ -30,6 +31,12 @@ Not every pipeline will have the feature extraction step during it's preprocessi
       - **Columns** = 810 features (18 nodes $\times$ 3 axes $\times$ 15 features)
       - **Feature Naming**: `{axis}_N{node_id}_{feature}` (e.g., `X_N1_mean`, `Z_N18_entropy`)
     - **Metadata Columns:** `Group_ID` (EOV combination) and `Class` (0=Healthy/Slightly Damaged, 1=Damaged).
+
+### Autoencoders Output Structure
+
+Even for the pipelines that does not have a feature extraction step, like autoencoders in the present case, the data still needs to be consolidated into a format that can be fed onwards into the training phase.
+
+
 
 ---
 
@@ -87,6 +94,10 @@ Each fold's test set uses unique EOV groups not seen in training.
 - **Hyperparameters:** Fixed values based on literature recommendations.
 - **Training:** Standard supervised learning.
 - **Prediction:** Predict class labels for the **Test Set**.
+
+### Branch C: Unsupervised Model (Autoencoder)
+
+#TODO
 
 ---
 
