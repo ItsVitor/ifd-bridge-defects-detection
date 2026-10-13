@@ -104,16 +104,7 @@ class BridgeDefectPipeline(ABC):
             X_test, y_test = self._prepare_test_set(X_test, y_test, fold_idx)
             
             # Filter: Remove low-variance and highly correlated features
-            variance_filter = VarianceThreshold(threshold=0.01)
-            X_train_filtered = variance_filter.fit_transform(X_train)
-            X_test_filtered = variance_filter.transform(X_test)
-            print(f"Fold {fold_idx}: Features after variance filter: {X_train_filtered.shape[1]}/{X_train.shape[1]}")
-            
-            # Correlation filter: Remove redundant features
-            X_train_filtered, X_test_filtered, kept_features = self._remove_correlated_features(
-                X_train_filtered, X_test_filtered, threshold=0.95
-            )
-            print(f"Fold {fold_idx}: Features after correlation filter: {X_train_filtered.shape[1]}")
+            X_train_filtered, X_test_filtered = self.select_features(X_train, X_test, fold_idx)
             
             # Normalize
             X_train_scaled, X_test_scaled = self.normalize(X_train_filtered, X_test_filtered)
@@ -378,6 +369,33 @@ class BridgeDefectPipeline(ABC):
     
 
     
+    def select_features(
+        self, X_train: np.ndarray, X_test: np.ndarray, fold_idx: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Remove features de baixa variância e altamente correlacionadas.
+
+        Os filtros são ajustados apenas no treino. Subclasses que consomem sinais
+        brutos (ex.: autoencoders) podem sobrescrever este método.
+
+        Args:
+            X_train (np.ndarray): Features de treino.
+            X_test (np.ndarray): Features de teste.
+            fold_idx (int): Número do fold atual.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: X_train e X_test filtrados.
+        """
+        variance_filter = VarianceThreshold(threshold=0.01)
+        X_train_filtered = variance_filter.fit_transform(X_train)
+        X_test_filtered = variance_filter.transform(X_test)
+        print(f"Fold {fold_idx}: Features after variance filter: {X_train_filtered.shape[1]}/{X_train.shape[1]}")
+
+        X_train_filtered, X_test_filtered, _ = self._remove_correlated_features(
+            X_train_filtered, X_test_filtered, threshold=0.95
+        )
+        print(f"Fold {fold_idx}: Features after correlation filter: {X_train_filtered.shape[1]}")
+        return X_train_filtered, X_test_filtered
+
     def _remove_correlated_features(
         self, X_train: np.ndarray, X_test: np.ndarray, threshold: float = 0.95
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
