@@ -1,0 +1,24 @@
+pipeline:
+  filter_type: "none"
+  cutoff_low: 1
+  cutoff_high: 20
+  sampling_frequency: 256
+  axes_to_use: ["X", "Y"]
+  nodes_to_use: [10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
+  fold_strategy: "predefined"
+  n_splits: 15
+
+model:
+  # Encoder: um bloco Conv1D + MaxPooling1D por item; o decoder é o espelho.
+  encoder_filters: [32, 32, 16]
+  pool_sizes: [4, 4, 2]
+  kernel_size: 9
+  # Coeficiente L1 de atividade sobre o espaço latente (esparsidade).
+  l1_activity: 1.0e-4
+  learning_rate: 1.0e-3
+  epochs: 100
+  batch_size: 32
+  validation_split: 0.1
+  early_stopping_patience: 10
+  # Limiar = média + k * desvio-padrão do erro de reconstrução no treino saudável.
+  threshold_k: 1.0
