@@ -36,6 +36,14 @@
 
 Even for the pipelines that does not have a feature extraction step, like autoencoders in the present case, the data still needs to be consolidated into a format that can be fed onwards into the training phase.
 
+1. **Signal Matrix:**
+    - Each Sample (experiment) becomes one row holding its raw acceleration signals, flattened from shape `(timesteps, channels)`.
+    - **Channels** = selected nodes $\times$ selected axes (`nodes_to_use` and `axes_to_use` in `config/autoencoders.yaml`; default 8 nodes $\times$ X, Y = 16 channels).
+    - **Column Naming:** `{axis}_N{node_id}_t{i}` (e.g., `X_N10654_t0`).
+    - **Metadata Columns:** `Group_ID` and `Class`, same as above.
+2. **Signal Length:** Records have 1827, 2010 or 2233 samples depending on train speed. All signals are cropped to the shortest length, rounded down to a multiple of the total pooling factor (1827 → 1824 samples, ≈ 7.1 s). Signals are **not** resampled, since that would shift the modal frequencies the model is meant to learn.
+3. **Reshape:** The `normalize` step reshapes each row back to `(timesteps, channels)` before training.
+
 
 
 ---
@@ -65,6 +73,7 @@ Each fold's test set uses unique EOV groups not seen in training.
 2. **Correlation Filter**: Remove highly correlated features (threshold=0.95) to reduce redundancy.
 3. **Fit** both filters using **only** the Training Data.
 4. **Transform** both Training and Test Data using the fitted filters.
+5. Implemented in `BridgeDefectPipeline.select_features`. The autoencoder pipeline overrides it as a no-op (see Branch C).
 
 ### Step 3.3: Data Normalization (Anti-Leakage)
 
@@ -95,9 +104,19 @@ Each fold's test set uses unique EOV groups not seen in training.
 - **Training:** Standard supervised learning.
 - **Prediction:** Predict class labels for the **Test Set**.
 
-### Branch C: Unsupervised Model (Autoencoder)
+### Branch C: Unsupervised Model (Sparse Conv1D Autoencoder)
 
-#TODO
+- **Input:** Raw signal matrix (see *Autoencoders Output Structure*), not statistical features.
+- **Feature Filtering:** Skipped. Columns are time instants, so variance/correlation filters would delete time steps and break the temporal continuity the convolutions rely on. Adjacent samples are naturally highly correlated; that is signal structure, not redundancy.
+- **Normalization:** Per-channel standardization (mean 0, std 1) fitted on training data only. Statistics are pooled over samples and time, so the waveform shape is preserved.
+- **Training Data:** **ONLY** Healthy samples (`Class 0`) from the Training partition. 10% held out (after shuffling) for early stopping.
+- **Architecture:** Hyperparameters in `config/autoencoders.yaml`.
+  - Encoder: 3 blocks of `Conv1D(kernel=9, ReLU, padding="same")` + `MaxPooling1D`, filters `[32, 32, 16]`, pools `[4, 4, 2]` (1824 → 57 timesteps, 16 channels → 16 latent channels).
+  - Sparse bottleneck: L1 activity regularization (`1e-4`) on the latent representation.
+  - Decoder: mirror of the encoder with `UpSampling1D`, ending in a linear `Conv1D` with one filter per input channel.
+  - Training: Adam (`lr=1e-3`), MSE loss, up to 100 epochs, batch 32, early stopping (patience 10, best weights restored).
+- **Threshold:** $\tau = \mu_{train} + k\,\sigma_{train}$ of the per-sample reconstruction MSE on the healthy training samples (`threshold_k = 1.0`).
+- **Prediction:** Reconstruction MSE $> \tau$ → Damaged (1), otherwise Healthy (0).
 
 ---
 
