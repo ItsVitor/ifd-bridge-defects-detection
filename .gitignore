@@ -208,3 +208,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Logs dos experimentos são versionados (ver docs/experiments.md)
+!outputs/*/E*/*.log
