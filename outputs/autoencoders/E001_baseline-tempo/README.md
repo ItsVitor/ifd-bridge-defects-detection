@@ -92,7 +92,7 @@ Comando equivalente no fluxo atual:
 |---|---|
 | `val_loss` final (folds 1–3) | 0,330; 0,348; 0,324, ainda caindo na época 100 |
 | Erro médio dos saudáveis de treino | 0,309 (MSE em unidades padronizadas; ~31% da energia não reconstruída) |
-| Saudáveis de treino acima do limiar | 15,9% (14,9%–17,1% por fold), perto dos ~16% pretendidos |
+| Saudáveis de treino acima do limiar | 15,9% (14,9%–17,1% por fold), perto dos ~16% que μ + 1σ deixa acima numa distribuição normal |
 | Assimetria do erro dos saudáveis de treino | 0,82 |
 
 η² do log-erro dos saudáveis de treino (média dos folds):
@@ -143,7 +143,7 @@ FPR por irregularidade: 16,4% na 1 e 44,4% na 2 (20 de 45).
 - **O peso explica o vaivém do FPR entre folds** (0% a 50%). Cada fold de teste tem um único peso, e o erro dos saudáveis de teste acompanha o erro que aquele peso tem no treino. O limiar global de ~0,40 corta metade dos saudáveis de peso 1,10.
 - **A irregularidade 2 é rara no treino** (~3% dos saudáveis) e é mal reconstruída: FPR de 44%.
 
-**O limiar se comportou como pretendido.** 15,9% dos saudáveis de treino ficaram acima, e a distribuição do erro é pouco assimétrica. A falha está no score, não na regra do limiar: com AUC ≈ 0,5, nenhum limiar separa os danos até 0,5.
+**O limiar se comportou como a regra prevê para uma distribuição quase normal.** 15,9% dos saudáveis de treino ficaram acima, e a distribuição do erro é pouco assimétrica. A falha está no score, não na regra do limiar: com AUC ≈ 0,5, nenhum limiar separa os danos até 0,5.
 
 **Onde está o erro (análise posterior, só com saudáveis).** O fold 1 foi treinado de novo com a mesma configuração e só arquivos saudáveis; por isso a normalização desse modelo já usou só saudáveis. O espectro do resíduo de reconstrução mostrou:
 
@@ -169,3 +169,4 @@ O modelo funciona como um passa-baixas de ~16 Hz. A faixa de 64–128 Hz não é
 ## Notas posteriores
 
 - 2026-10-21: registro retroativo criado a partir de `run.log`, `run_original.log`, dos parquets e das análises feitas durante as sessões de 2026-10-12 a 2026-10-20.
+- 2026-10-21: as seções 8.1 e 9 falavam em "~16% pretendidos". Não havia intenção de 16%: é só a fração que μ + 1σ deixa acima numa distribuição normal. Texto corrigido.
