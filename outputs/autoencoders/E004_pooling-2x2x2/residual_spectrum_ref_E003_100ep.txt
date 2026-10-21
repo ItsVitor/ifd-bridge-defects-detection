@@ -1,0 +1,17 @@
+Experiment: C:\Users\vitor\AppData\Local\Temp\E003_100ep | fold 1, healthy training samples only (1260)
+Threshold (fold 1): 0.1042
+Relative error (residual energy / input energy): 0.0626
+
+band (Hz) | input share | residual share | band not reconstructed | output/input energy
+  0-1      |   0.0245    |    0.0295      |   0.075                |   0.968
+  1-4      |   0.1405    |    0.1121      |   0.050                |   0.981
+  4-8      |   0.1946    |    0.1716      |   0.055                |   0.969
+  8-12     |   0.4982    |    0.3723      |   0.047                |   0.897
+ 12-16     |   0.1350    |    0.1942      |   0.090                |   0.843
+ 16-20     |   0.0067    |    0.0536      |   0.498                |   1.076
+ 20-32     |   0.0005    |    0.0452      |   n/a (no input)       |   n/a
+ 32-64     |   0.0000    |    0.0130      |   n/a (no input)       |   n/a
+ 64-128    |   0.0000    |    0.0086      |   n/a (no input)       |   n/a
+
+Latent shape (57, 16) (912 values), zeros: 0.894, active channels: 14/16
+L1 penalty / MSE: 0.1022
