@@ -66,6 +66,7 @@ Each fold's test set uses unique EOV groups not seen in training.
 1. **Test Set:** Select all samples belonging to the EOV groups assigned to the current `Fold_ID`.
 2. **Training Set:** Select all samples belonging to the remaining EOV groups.
 3. **Strict Balancing:** Ensure the Test Set has exactly a 1:1 ratio of Healthy to Damaged samples (downsample the majority class if necessary).
+4. **Unsupervised Premise:** For unsupervised pipelines (`supervised = False`, the default), damaged samples are dropped from the Training Set right after the split, so every fitted step (feature filters, normalization, model, threshold) sees healthy data only. Only the Random Forest baseline sets `supervised = True`.
 
 ### Step 3.2: Feature Filtering
 

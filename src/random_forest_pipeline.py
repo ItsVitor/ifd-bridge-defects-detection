@@ -16,6 +16,9 @@ class RandomForestPipeline(BridgeDefectPipeline):
         random_state (int): Random seed for reproducibility.
     """
 
+    # Baseline supervisionado (limite superior): treina com ambas as classes.
+    supervised: bool = True
+
     def __init__(
         self,
         config_path: str,

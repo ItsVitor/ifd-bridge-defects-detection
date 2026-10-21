@@ -33,6 +33,10 @@ class BridgeDefectPipeline(ABC):
         random_seed (int | None): Random seed for reproducibility.
     """
 
+    # Premissa não supervisionada: se False, todo ajuste do fold (filtros,
+    # normalização, modelo e limiar) usa apenas amostras saudáveis do treino.
+    supervised: bool = False
+
     def __init__(
         self,
         config_path: str,
@@ -99,6 +103,11 @@ class BridgeDefectPipeline(ABC):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
             groups_train = groups[train_idx]
+
+            # Unsupervised: drop damaged samples before anything is fitted
+            if not self.supervised:
+                healthy = y_train == 0
+                X_train, y_train, groups_train = X_train[healthy], y_train[healthy], groups_train[healthy]
             
             # Prepare test set (model-specific balancing/validation)
             X_test, y_test = self._prepare_test_set(X_test, y_test, fold_idx)
