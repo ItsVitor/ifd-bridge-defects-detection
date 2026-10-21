@@ -8,6 +8,32 @@ from tqdm import tqdm
 from pipeline_template import BridgeDefectPipeline
 
 
+def compute_threshold(errors: np.ndarray, rule: str, k: float, percentile: float | None) -> float:
+    """Calcula o limiar de anomalia a partir dos erros de reconstrução de saudáveis.
+
+    Args:
+        errors (np.ndarray): Erros de reconstrução das amostras saudáveis de treino.
+        rule (str): "mean_std" (média + k * desvio) ou "percentile" (percentil dos erros).
+        k (float): Número de desvios-padrão para a regra "mean_std".
+        percentile (float | None): Percentil (0-100) para a regra "percentile".
+
+    Returns:
+        float: Limiar acima do qual uma amostra é classificada como anômala.
+
+    Raises:
+        ValueError: Se a regra for desconhecida ou o percentil estiver ausente/fora de 0-100.
+    """
+    if rule == "mean_std":
+        return float(errors.mean() + k * errors.std())
+    if rule == "percentile":
+        if percentile is None or not 0 < percentile < 100:
+            raise ValueError(f"threshold_percentile must be in (0, 100), got {percentile}")
+        # Garante a fração (100 - percentil)% dos saudáveis acima do limiar, qualquer que
+        # seja o formato da distribuição dos erros.
+        return float(np.percentile(errors, percentile))
+    raise ValueError(f"Unknown threshold_rule: {rule!r}")
+
+
 class ThresholdedAutoencoder:
     """Autoencoder treinado acompanhado do limiar de erro de reconstrução.
 
@@ -87,6 +113,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.validation_split = cfg["validation_split"]
         self.early_stopping_patience = cfg["early_stopping_patience"]
         self.threshold_k = cfg["threshold_k"]
+        # Configs anteriores ao E005 não têm estas chaves e usam média + k * desvio.
+        self.threshold_rule = cfg.get("threshold_rule", "mean_std")
+        self.threshold_percentile = cfg.get("threshold_percentile")
         self.random_state = random_state
         self.n_channels: int | None = None
         # Diagnóstico: metadados por experimento e erros de reconstrução por fold.
@@ -223,8 +252,8 @@ class AutoencoderPipeline(BridgeDefectPipeline):
     ) -> ThresholdedAutoencoder:
         """Treina o autoencoder com amostras saudáveis e define o limiar de anomalia.
 
-        Limiar = média + k * desvio-padrão do erro de reconstrução das amostras
-        saudáveis de treino.
+        O limiar vem só do erro de reconstrução das amostras saudáveis de treino, pela
+        regra configurada em ``threshold_rule`` (ver ``compute_threshold``).
 
         Args:
             X_train (np.ndarray): Sinais de treino padronizados (amostras, tempo, canais).
@@ -255,7 +284,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         detector = ThresholdedAutoencoder(model, threshold=0.0, error_log=self.test_errors)
         # Erros na ordem original (não embaralhada), para casar com os metadados.
         errors = detector.reconstruction_error(X_healthy)
-        detector.threshold = float(errors.mean() + self.threshold_k * errors.std())
+        detector.threshold = compute_threshold(
+            errors, self.threshold_rule, self.threshold_k, self.threshold_percentile
+        )
         self.train_errors.append(errors)
         self.thresholds.append(detector.threshold)
         print(f"Train error: mean={errors.mean():.4f}, std={errors.std():.4f} -> threshold={detector.threshold:.4f}")

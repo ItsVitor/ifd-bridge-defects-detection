@@ -162,7 +162,8 @@ if __name__ == "__main__":
     print(
         f"\nHyperparameters: filters={pipeline.encoder_filters}, pools={pipeline.pool_sizes}, "
         f"kernel={pipeline.kernel_size}, l1={pipeline.l1_activity}, lr={pipeline.learning_rate}, "
-        f"threshold_k={pipeline.threshold_k}"
+        f"threshold_rule={pipeline.threshold_rule}, threshold_k={pipeline.threshold_k}, "
+        f"threshold_percentile={pipeline.threshold_percentile}"
     )
 
     print("\nRunning full pipeline...")
