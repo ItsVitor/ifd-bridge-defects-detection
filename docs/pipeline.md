@@ -119,6 +119,7 @@ Each fold's test set uses unique EOV groups not seen in training.
   - Training: Adam (`lr=1e-3`), MSE loss, up to 100 epochs, batch 32, early stopping (patience 10, best weights restored).
 - **Threshold:** $\tau = \mu_{train} + k\,\sigma_{train}$ of the per-sample reconstruction MSE on the healthy training samples (`threshold_k = 1.0`).
 - **Prediction:** Reconstruction MSE $> \tau$ → Damaged (1), otherwise Healthy (0).
+- **Diagnostics (evaluation only):** `test_autoencoders.py` saves the per-sample reconstruction errors with their EOV metadata to `outputs/autoencoders_test_errors.parquet` (test samples, all classes) and `outputs/autoencoders_train_errors.parquet` (healthy training samples, per fold), plus `outputs/autoencoders_error_distribution.png`. It also reports within-fold ROC AUC (overall and per severity) and how much of the healthy training error each EOV factor explains ($\eta^2$). These numbers are diagnostic only and must never be used to set the threshold or any hyperparameter.
 
 ---
 
