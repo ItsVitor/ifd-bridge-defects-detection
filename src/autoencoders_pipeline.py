@@ -116,7 +116,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         signals, classes, group_ids = [], [], []
         for _, exp_group in tqdm(data.groupby("ExperimentID"), desc="Building signal matrix"):
             channels = [
-                self._apply_filter(node_data[col].to_numpy()[:length])
+                # Filtra o registro completo e só depois recorta, evitando o transiente
+                # de borda do filtfilt no ponto de corte.
+                self._apply_filter(node_data[col].to_numpy())[:length]
                 for _, node_data in exp_group.groupby("NodeID")
                 for col in axes_cols
             ]
