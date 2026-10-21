@@ -1,4 +1,4 @@
-﻿pipeline:
+pipeline:
   # Passa-banda 1-20 Hz: mant├®m a banda modal (picos de 4-15.5 Hz) e remove a
   # faixa de 64-128 Hz, que o autoencoder n├úo reconstr├│i e dominava o erro.
   filter_type: "both"

@@ -1,4 +1,4 @@
-﻿pipeline:
+pipeline:
   filter_type: "none"
   cutoff_low: 1
   cutoff_high: 20
