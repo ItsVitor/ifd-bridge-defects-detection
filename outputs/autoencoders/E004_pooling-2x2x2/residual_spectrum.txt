@@ -1,0 +1,17 @@
+Experiment: outputs\autoencoders\E004_pooling-2x2x2 | fold 1, healthy training samples only (1260)
+Threshold (fold 1): 0.0172
+Relative error (residual energy / input energy): 0.0081
+
+band (Hz) | input share | residual share | band not reconstructed | output/input energy
+  0-1      |   0.0245    |    0.0284      |   0.009                |   1.038
+  1-4      |   0.1405    |    0.1295      |   0.007                |   1.017
+  4-8      |   0.1946    |    0.2104      |   0.009                |   1.024
+  8-12     |   0.4982    |    0.3262      |   0.005                |   0.978
+ 12-16     |   0.1350    |    0.1898      |   0.011                |   1.001
+ 16-20     |   0.0067    |    0.0690      |   0.083                |   0.933
+ 20-32     |   0.0005    |    0.0372      |   n/a (no input)       |   n/a
+ 32-64     |   0.0000    |    0.0044      |   n/a (no input)       |   n/a
+ 64-128    |   0.0000    |    0.0050      |   n/a (no input)       |   n/a
+
+Latent shape (228, 4) (912 values), zeros: 0.544, active channels: 3/4
+L1 penalty / MSE: 0.2921
