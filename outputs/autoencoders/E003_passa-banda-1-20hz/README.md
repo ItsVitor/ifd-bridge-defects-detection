@@ -198,3 +198,4 @@ FPR e TPR por peso de vagão do fold:
 
 - 2026-10-21: registro retroativo criado a partir de `run.log`, dos parquets e das análises feitas durante as sessões.
 - 2026-10-21: a seção 9 dizia que o limiar "deixou de funcionar como pretendido", supondo uma intenção de 16% de alarmes. Essa intenção nunca existiu: 16% é só a fração que μ + 1σ deixa acima numa distribuição normal, e o k = 1 foi pedido como ponto de partida simples. Texto corrigido.
+- 2026-10-21: adicionado `residual_spectrum.txt`, o espectro do resíduo do fold 1 medido com `src/residual_spectrum.py` (só saudáveis de treino). O limiar do fold 1 reproduz o do run (0,0753). Principais números: erro relativo de 4,4%; 8% do resíduo acima de 20 Hz, onde a entrada não tem energia; 37% da faixa de 16–20 Hz não reconstruída; 88,6% de zeros no latente; penalidade L1 = 10% do MSE.

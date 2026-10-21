@@ -1,0 +1,17 @@
+Experiment: outputs\autoencoders\E003_passa-banda-1-20hz | fold 1, healthy training samples only (1260)
+Threshold (fold 1): 0.0753
+Relative error (residual energy / input energy): 0.0443
+
+band (Hz) | input share | residual share | band not reconstructed | output/input energy
+  0-1      |   0.0245    |    0.0293      |   0.053                |   0.976
+  1-4      |   0.1405    |    0.1130      |   0.036                |   1.010
+  4-8      |   0.1946    |    0.1759      |   0.040                |   0.999
+  8-12     |   0.4982    |    0.3590      |   0.032                |   0.952
+ 12-16     |   0.1350    |    0.1859      |   0.061                |   0.909
+ 16-20     |   0.0067    |    0.0565      |   0.371                |   1.097
+ 20-32     |   0.0005    |    0.0559      |   n/a (no input)       |   n/a
+ 32-64     |   0.0000    |    0.0158      |   n/a (no input)       |   n/a
+ 64-128    |   0.0000    |    0.0087      |   n/a (no input)       |   n/a
+
+Latent shape (57, 16) (912 values), zeros: 0.886, active channels: 14/16
+L1 penalty / MSE: 0.1008
