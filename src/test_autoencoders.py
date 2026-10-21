@@ -1,6 +1,8 @@
 """Script de teste do pipeline de Autoencoder Conv1D Esparso."""
 
+import argparse
 import os
+import subprocess
 
 import numpy as np
 import pandas as pd
@@ -8,9 +10,24 @@ from sklearn.metrics import roc_auc_score
 
 from autoencoders_pipeline import AutoencoderPipeline
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "autoencoders.yaml")
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "outputs")
 EOV_FACTORS = ["Velocidade", "Peso_Vagao", "Modulo_Elasticidade", "Irregularidade"]
+
+
+def git_revision() -> str:
+    """Identifica a versão do código usada no run (commit atual e alterações pendentes em src/).
+
+    Returns:
+        str: Hash curto do commit, com aviso se houver alterações não commitadas em src/,
+            ou "unknown" se o git não estiver disponível.
+    """
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", "src"],
+                               capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return f"{commit} (WARNING: uncommitted changes in src/)" if dirty else commit
 
 
 def eta_squared(values: pd.Series, labels: pd.Series) -> float:
@@ -116,8 +133,15 @@ def plot_error_distribution(test_df: pd.DataFrame, path: str) -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Roda um experimento do autoencoder (ver docs/experiments.md).")
+    parser.add_argument("experiment_dir", help="Pasta do experimento, contendo o config.yaml congelado.")
+    experiment_dir = parser.parse_args().experiment_dir
+    config_path = os.path.join(experiment_dir, "config.yaml")
+    if not os.path.isfile(config_path):
+        parser.error(f"config.yaml not found in {experiment_dir}")
+
     pipeline = AutoencoderPipeline(
-        config_path=CONFIG_PATH,
+        config_path=config_path,
         data_dir=os.path.join(".", "data"),
         file_config=[
             (os.path.join("v2", "v2_healthy.parquet"), 0),
@@ -133,6 +157,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print("SPARSE CONV1D AUTOENCODER PIPELINE TEST")
     print("=" * 60)
+    print(f"\nExperiment: {experiment_dir}")
+    print(f"Code revision: {git_revision()}")
     print(
         f"\nHyperparameters: filters={pipeline.encoder_filters}, pools={pipeline.pool_sizes}, "
         f"kernel={pipeline.kernel_size}, l1={pipeline.l1_activity}, lr={pipeline.learning_rate}, "
@@ -182,8 +208,8 @@ if __name__ == "__main__":
          for i, ((tr, _), err) in enumerate(zip(splits, pipeline.train_errors), 1)],
         ignore_index=True,
     )
-    test_df.to_parquet(os.path.join(OUTPUT_DIR, "autoencoders_test_errors.parquet"))
-    train_df.to_parquet(os.path.join(OUTPUT_DIR, "autoencoders_train_errors.parquet"))
+    test_df.to_parquet(os.path.join(experiment_dir, "test_errors.parquet"))
+    train_df.to_parquet(os.path.join(experiment_dir, "train_errors.parquet"))
 
     # As predições do run() são exatamente erro > limiar do fold.
     assert np.array_equal(preds["y_pred"], (test_df["error"] > test_df["threshold"]).astype(int))
@@ -194,7 +220,7 @@ if __name__ == "__main__":
     print("recall: damaged of that severity flagged | fpr: all healthy test samples flagged")
     print("auc: within-fold AUC (healthy test vs. that severity), mean and std over folds")
     print(severity_report(test_df).round(4).to_string(index=False))
-    plot_path = os.path.join(OUTPUT_DIR, "autoencoders_error_distribution.png")
+    plot_path = os.path.join(experiment_dir, "error_distribution.png")
     plot_error_distribution(test_df, plot_path)
     print(f"\nError distribution plot saved to {plot_path}")
 
