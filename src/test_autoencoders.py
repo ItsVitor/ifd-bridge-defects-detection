@@ -132,6 +132,57 @@ def plot_error_distribution(test_df: pd.DataFrame, path: str) -> None:
     plt.close(fig)
 
 
+def print_error_report(test_df: pd.DataFrame, train_df: pd.DataFrame, experiment_dir: str) -> None:
+    """Imprime o relatório por severidade e o diagnóstico do erro, e salva o gráfico.
+
+    Uso apenas na avaliação: nada aqui ajusta o modelo ou o limiar.
+
+    Args:
+        test_df (pd.DataFrame): Amostras de teste com metadados, 'fold', 'error' e 'threshold'.
+        train_df (pd.DataFrame): Saudáveis de treino com metadados, 'fold' e 'error'.
+        experiment_dir (str): Pasta do experimento, onde o gráfico é salvo.
+    """
+    print("\n" + "=" * 60)
+    print("PERFORMANCE BY DAMAGE SEVERITY")
+    print("=" * 60)
+    print("recall: damaged of that severity flagged | fpr: all healthy test samples flagged")
+    print("auc: within-fold AUC (healthy test vs. that severity), mean and std over folds")
+    print(severity_report(test_df).round(4).to_string(index=False))
+    plot_path = os.path.join(experiment_dir, "error_distribution.png")
+    plot_error_distribution(test_df, plot_path)
+    print(f"\nError distribution plot saved to {plot_path}")
+
+    print("\n" + "=" * 60)
+    print("DIAGNOSTICS: RECONSTRUCTION ERROR")
+    print("=" * 60)
+    print(f"\nPooled AUC (all folds): {roc_auc_score(test_df['Class'], test_df['error']):.4f}")
+
+    rows = []
+    for fold, g in test_df.groupby("fold"):
+        rows.append({
+            "fold": fold,
+            "peso": g["Peso_Vagao"].iloc[0],
+            "modulo": g["Modulo_Elasticidade"].iloc[0],
+            "train_healthy": train_df.loc[train_df["fold"] == fold, "error"].mean(),
+            "test_healthy": g.loc[g["Class"] == 0, "error"].mean(),
+            "test_damaged": g.loc[g["Class"] == 1, "error"].mean(),
+            "threshold": g["threshold"].iloc[0],
+            "auc": roc_auc_score(g["Class"], g["error"]),
+        })
+    print("\nPer fold (mean reconstruction error and within-fold AUC):")
+    print(pd.DataFrame(rows).round(4).to_string(index=False))
+
+    print("\nHealthy TRAIN error vs. EOV (eta^2 of log-error, mean over folds):")
+    for factor in EOV_FACTORS:
+        etas = [eta_squared(np.log(g["error"]), g[factor]) for _, g in train_df.groupby("fold")]
+        level_means = {k: round(float(v), 4) for k, v in train_df.groupby(factor)["error"].mean().items()}
+        print(f"  {factor:20s} eta^2={np.mean(etas):.3f}  mean error by level: {level_means}")
+
+    healthy_test = test_df[test_df["Class"] == 0]
+    print("\nHealthy TEST error by Irregularidade:",
+          {k: round(float(v), 4) for k, v in healthy_test.groupby("Irregularidade")["error"].mean().items()})
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Roda um experimento do autoencoder (ver docs/experiments.md).")
     parser.add_argument("experiment_dir", help="Pasta do experimento, contendo o config.yaml congelado.")
@@ -215,42 +266,4 @@ if __name__ == "__main__":
     # As predições do run() são exatamente erro > limiar do fold.
     assert np.array_equal(preds["y_pred"], (test_df["error"] > test_df["threshold"]).astype(int))
 
-    print("\n" + "=" * 60)
-    print("PERFORMANCE BY DAMAGE SEVERITY")
-    print("=" * 60)
-    print("recall: damaged of that severity flagged | fpr: all healthy test samples flagged")
-    print("auc: within-fold AUC (healthy test vs. that severity), mean and std over folds")
-    print(severity_report(test_df).round(4).to_string(index=False))
-    plot_path = os.path.join(experiment_dir, "error_distribution.png")
-    plot_error_distribution(test_df, plot_path)
-    print(f"\nError distribution plot saved to {plot_path}")
-
-    print("\n" + "=" * 60)
-    print("DIAGNOSTICS: RECONSTRUCTION ERROR")
-    print("=" * 60)
-    print(f"\nPooled AUC (all folds): {roc_auc_score(test_df['Class'], test_df['error']):.4f}")
-
-    rows = []
-    for fold, g in test_df.groupby("fold"):
-        rows.append({
-            "fold": fold,
-            "peso": g["Peso_Vagao"].iloc[0],
-            "modulo": g["Modulo_Elasticidade"].iloc[0],
-            "train_healthy": train_df.loc[train_df["fold"] == fold, "error"].mean(),
-            "test_healthy": g.loc[g["Class"] == 0, "error"].mean(),
-            "test_damaged": g.loc[g["Class"] == 1, "error"].mean(),
-            "threshold": g["threshold"].iloc[0],
-            "auc": roc_auc_score(g["Class"], g["error"]),
-        })
-    print("\nPer fold (mean reconstruction error and within-fold AUC):")
-    print(pd.DataFrame(rows).round(4).to_string(index=False))
-
-    print("\nHealthy TRAIN error vs. EOV (eta^2 of log-error, mean over folds):")
-    for factor in EOV_FACTORS:
-        etas = [eta_squared(np.log(g["error"]), g[factor]) for _, g in train_df.groupby("fold")]
-        level_means = {k: round(float(v), 4) for k, v in train_df.groupby(factor)["error"].mean().items()}
-        print(f"  {factor:20s} eta^2={np.mean(etas):.3f}  mean error by level: {level_means}")
-
-    healthy_test = test_df[test_df["Class"] == 0]
-    print("\nHealthy TEST error by Irregularidade:",
-          {k: round(float(v), 4) for k, v in healthy_test.groupby("Irregularidade")["error"].mean().items()})
+    print_error_report(test_df, train_df, experiment_dir)
