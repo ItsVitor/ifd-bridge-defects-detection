@@ -108,6 +108,7 @@ Each fold's test set uses unique EOV groups not seen in training.
 ### Branch C: Unsupervised Model (Sparse Conv1D Autoencoder)
 
 - **Input:** Raw signal matrix (see *Autoencoders Output Structure*), not statistical features.
+- **Band-pass Filter:** Zero-phase Butterworth (order 4, `filtfilt`) at 1–20 Hz, applied to the full record before cropping. Rationale (healthy data only): the modal peaks lie at 4–15.5 Hz, and without filtering the 64–128 Hz band (~19% of the energy) was not reconstructed at all and made up ~68% of the reconstruction error.
 - **Feature Filtering:** Skipped. Columns are time instants, so variance/correlation filters would delete time steps and break the temporal continuity the convolutions rely on. Adjacent samples are naturally highly correlated; that is signal structure, not redundancy.
 - **Normalization:** Per-channel standardization (mean 0, std 1) fitted on training data only. Statistics are pooled over samples and time, so the waveform shape is preserved.
 - **Training Data:** **ONLY** Healthy samples (`Class 0`) from the Training partition. 10% held out (after shuffling) for early stopping.
