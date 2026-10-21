@@ -17,14 +17,19 @@ class ThresholdedAutoencoder:
     Args:
         model (keras.Model): Autoencoder treinado.
         threshold (float): Limiar de erro de reconstrução acima do qual a amostra é anômala.
+        error_log (list[np.ndarray] | None): Lista onde ``predict`` acumula os erros de
+            cada chamada, para diagnóstico posterior. None desativa o registro.
     """
 
-    def __init__(self, model: keras.Model, threshold: float) -> None:
+    def __init__(
+        self, model: keras.Model, threshold: float, error_log: list[np.ndarray] | None = None
+    ) -> None:
         self.model = model
         self.threshold = threshold
+        self.error_log = error_log
 
     def reconstruction_error(self, X: np.ndarray) -> np.ndarray:
-        """Calcula o erro quadrático médio de reconstrução por amostra.
+        """Calcula o erro quadrático médio (MSE) de reconstrução por amostra.
 
         Args:
             X (np.ndarray): Sinais no formato (amostras, tempo, canais).
@@ -44,7 +49,10 @@ class ThresholdedAutoencoder:
         Returns:
             np.ndarray: Rótulos binários (0=saudável, 1=danificado).
         """
-        return (self.reconstruction_error(X) > self.threshold).astype(int)
+        errors = self.reconstruction_error(X)
+        if self.error_log is not None:
+            self.error_log.append(errors)
+        return (errors > self.threshold).astype(int)
 
 
 class AutoencoderPipeline(BridgeDefectPipeline):
@@ -81,8 +89,13 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.threshold_k = cfg["threshold_k"]
         self.random_state = random_state
         self.n_channels: int | None = None
+        # Diagnóstico: metadados por experimento e erros de reconstrução por fold.
+        self.sample_metadata: pd.DataFrame | None = None
+        self.train_errors: list[np.ndarray] = []
+        self.test_errors: list[np.ndarray] = []
+        self.thresholds: list[float] = []
 
-    def extract_features(self, raw_data: pd.DataFrame) -> pd.DataFrame:
+    def extract_features(self, raw_data: pd.DataFrame) -> pd.DataFrame: #TODO: adicionar typing @override
         """Monta a matriz de sinais brutos, uma linha por experimento.
 
         Cada linha contém o sinal (tempo x canais) achatado; ``normalize`` o
@@ -113,7 +126,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         length = (min_length // down_factor) * down_factor
         print(f"Signal length: {min_length} -> cropped to {length} samples ({length / self.fs:.2f} s)")
 
-        signals, classes, group_ids = [], [], []
+        meta_cols = ["ExperimentID", "Velocidade", "Peso_Vagao", "Modulo_Elasticidade",
+                     "Irregularidade", "Dano_Percentual", "Class"]
+        signals, classes, group_ids, metadata = [], [], [], []
         for _, exp_group in tqdm(data.groupby("ExperimentID"), desc="Building signal matrix"):
             channels = [
                 # Filtra o registro completo e só depois recorta, evitando o transiente
@@ -125,6 +140,11 @@ class AutoencoderPipeline(BridgeDefectPipeline):
             signals.append(np.stack(channels, axis=-1).astype(np.float32).ravel())
             classes.append(exp_group["Class"].iloc[0])
             group_ids.append(self._compute_group_id(exp_group))
+            metadata.append(exp_group[meta_cols].iloc[[0]])
+
+        # Mesma ordem de linhas da matriz de sinais (usada no diagnóstico de erros).
+        self.sample_metadata = pd.concat(metadata, ignore_index=True)
+        self.sample_metadata["Group_ID"] = group_ids
 
         columns = [f"{c.split('_')[1]}_N{n}_t{t}" for t in range(length) for n in node_ids for c in axes_cols]
         feature_df = pd.DataFrame(np.vstack(signals), columns=columns)
@@ -132,7 +152,7 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         feature_df["Group_ID"] = group_ids
         return feature_df
 
-    def select_features(
+    def select_features( #TODO: adicionar typing @override
         self, X_train: np.ndarray, X_test: np.ndarray, fold_idx: int
     ) -> tuple[np.ndarray, np.ndarray]:
         """Não aplica filtros de variância/correlação: as colunas são instantes de tempo.
@@ -155,12 +175,12 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         """Padroniza cada canal (média 0, desvio 1) com estatísticas apenas do treino.
 
         A padronização é por canal, e não por instante de tempo, para preservar a
-        forma de onda; as acelerações brutas têm ordem de 1e-3, o que dificultaria
-        a otimização da rede.
+        forma de onda; as acelerações brutas são pequenas (RMS ~5e-2), o que
+        dificultaria a otimização da rede.
 
         Args:
             X_train (np.ndarray): Sinais de treino achatados (amostras, tempo*canais).
-            X_test (np.ndarray): Sinais de teste achatados (amostras, tempo*canais).
+            X_test (np.nwdarray): Sinais de teste achatados (amostras, tempo*canais).
 
         Returns:
             tuple[np.ndarray, np.ndarray]: X_train e X_test no formato (amostras, tempo, canais).
@@ -214,14 +234,15 @@ class AutoencoderPipeline(BridgeDefectPipeline):
             ThresholdedAutoencoder: Modelo treinado com o limiar calculado.
         """
         keras.utils.set_random_seed(self.random_state)
+        X_healthy = X_train[y_train == 0]
         # Embaralha antes do fit: o validation_split do Keras pega as últimas amostras,
         # que estão ordenadas por arquivo/experimento.
-        X_healthy = np.random.default_rng(self.random_state).permutation(X_train[y_train == 0])
+        X_shuffled = np.random.default_rng(self.random_state).permutation(X_healthy)
         print(f"Training autoencoder on {X_healthy.shape[0]} healthy samples, input shape {X_healthy.shape[1:]}")
 
         model = self.build_model(*X_healthy.shape[1:])
         model.fit(
-            X_healthy, X_healthy,
+            X_shuffled, X_shuffled,
             epochs=self.epochs,
             batch_size=self.batch_size,
             validation_split=self.validation_split,
@@ -231,8 +252,11 @@ class AutoencoderPipeline(BridgeDefectPipeline):
             verbose=2,
         )
 
-        detector = ThresholdedAutoencoder(model, threshold=0.0)
+        detector = ThresholdedAutoencoder(model, threshold=0.0, error_log=self.test_errors)
+        # Erros na ordem original (não embaralhada), para casar com os metadados.
         errors = detector.reconstruction_error(X_healthy)
         detector.threshold = float(errors.mean() + self.threshold_k * errors.std())
+        self.train_errors.append(errors)
+        self.thresholds.append(detector.threshold)
         print(f"Train error: mean={errors.mean():.4f}, std={errors.std():.4f} -> threshold={detector.threshold:.4f}")
         return detector
