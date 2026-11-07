@@ -198,3 +198,5 @@ Próximos experimentos possíveis, motivados só por saudáveis ou por raciocín
 - **Penalidade L1** (29% do MSE, um canal morto), **200 épocas** e **substituição do `UpSampling1D`**: continuam pendentes (E004, seção 10).
 
 ## Notas posteriores
+
+- 2026-10-22: **correção da seção 9.** A afirmação de que, nos folds 10–12, "o treino daquele fold não tem nenhuma passagem com esse peso" está errada. Cada fold de teste é uma combinação peso × módulo; o treino dos folds 10–12 tem 180 saudáveis de peso 0,90 (os dos outros dois módulos), contra 270 de cada outro peso. O mesmo vale para o peso 1,10. A explicação medida, só com saudáveis de treino (`train_errors.parquet`): das 63 passagens acima do percentil 95 em cada fold, em média 14 são do grupo irregularidade 2 × módulo 0,975, 40 são de peso 0,90 e só ~9 são dos outros pesos (~0,9% deles). O limiar cai, portanto, dentro da cauda superior do peso 0,90, que é mais difícil de reconstruir: os saudáveis de peso 0,90 do teste ficam com FPR alto, e os outros pesos operam, na prática, com α ≈ 1%, e não 5%. Isso também afeta o recall dos outros pesos.
