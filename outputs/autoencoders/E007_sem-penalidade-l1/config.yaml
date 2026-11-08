@@ -1,0 +1,29 @@
+pipeline:
+  # Passa-banda 1-20 Hz: mantém a banda modal (picos de 4-15.5 Hz) e remove a
+  # faixa de 64-128 Hz, que o autoencoder não reconstrói e dominava o erro.
+  filter_type: "both"
+  cutoff_low: 1
+  cutoff_high: 20
+  sampling_frequency: 256
+  axes_to_use: ["X", "Y"]
+  nodes_to_use: [10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
+  fold_strategy: "predefined"
+  n_splits: 15
+
+model:
+  # Encoder: um bloco Conv1D + MaxPooling1D por item; o decoder é o espelho.
+  encoder_filters: [32, 32, 4]
+  pool_sizes: [2, 2, 2]
+  kernel_size: 19
+  # Coeficiente L1 de atividade sobre o espaço latente (esparsidade).
+  l1_activity: 0.0
+  learning_rate: 1.0e-3
+  epochs: 200
+  batch_size: 32
+  validation_split: 0.1
+  early_stopping_patience: 10
+  # Limiar = percentil 95 do erro de reconstrução dos saudáveis de treino.
+  # threshold_k só é usado pela regra "mean_std".
+  threshold_rule: "percentile"
+  threshold_percentile: 95
+  threshold_k: 1.0
