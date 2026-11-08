@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Status | Proposto |
+| Status | Concluído (não adotado) |
 | Pai (base de comparação) | [E006](../E006_200-epocas-pooling-2x2x2/README.md) |
 | Proposto em | 2026-11-08 |
-| Executado em | — |
-| Código | — (commitar antes do run) |
+| Executado em | 2026-11-08 |
+| Código | commit `c7551b7` |
 
 ## 1. Motivação
 
@@ -123,10 +123,103 @@ Duração estimada: parecida com a do E006, que levou ~6h20 na outra máquina. O
 
 **Limitação:** canais ativos, zeros e o espectro do resíduo são medidos só no fold 1 (ver discussão no E006). O critério 4.3 (2) depende dessa medição única.
 
+**Execução real (2026-11-08), em outra máquina do autor:**
+- Código: commit `c7551b7`, sem alterações pendentes em `src/` (registrado no `run.log`).
+- Run principal e diagnóstico do resíduo completos, sem erros; o gráfico foi gerado normalmente.
+- O `run.log` começa às 01:31; a duração exata não foi registrada (os arquivos de saída foram gravados na pasta às 12:00, possivelmente na cópia entre máquinas).
+- O early stopping parou os 15 folds, entre as épocas 87 e 152: 112, 147, 152, 148, 87, 107, 114, 103, 146, 91, 104, 141, 121, 149, 106 (1828 épocas no total, contra 2072 no E006).
+- O limiar do fold 1 no diagnóstico do resíduo (0,0070) é igual ao do run, então o retreino reproduziu o fold 1.
+
 ## 8. Resultados
+
+### 8.1 Critérios só com saudáveis
+
+| Critério | E006 | Previsão | E007 | Resultado |
+|---|---|---|---|---|
+| Mediana, entre folds, do MSE médio dos saudáveis de treino | 0,0077 (0,0071–0,0103) | Menor | 0,0050 (0,0043–0,0060), −35% | Confirmada |
+| Canais ativos no latente (fold 1) | 2 de 4 | 4 de 4 | 4 de 4 | Confirmada |
+| Zeros no latente (fold 1) | 53,3% | Menor, acima de 0% | 22,7% | Confirmada |
+| Penalidade L1 ÷ MSE (fold 1) | 0,29 | 0 | 0 | Confirmada (por construção) |
+| Erro relativo total, fold 1 | 0,64% | Menor | 0,41% | Confirmada |
+| Parte não reconstruída de 16–20 Hz, fold 1 | 7,1% | Menor; ainda a pior faixa | 5,2%; ainda a pior faixa | Confirmada |
+| Erro do peso 0,90 ÷ outros pesos | 1,31 (1,26–1,48) | Sem previsão | 1,35 (1,29–1,51) | Não mudou (leve alta) |
+| Folds parados pelo early stopping | 15 de 15 | Maioria | 15 de 15 | Confirmada |
+
+Com `l1_activity = 0`, o `val_loss` passa a ser o MSE puro de validação: mediana do melhor valor dos 15 folds 0,0053. Não é comparável ao 0,0117 do E006, que incluía a penalidade (seção 1).
+
+Parte não reconstruída por faixa, fold 1:
+
+| Faixa (Hz) | 0–1 | 1–4 | 4–8 | 8–12 | 12–16 | 16–20 |
+|---|---|---|---|---|---|---|
+| E006 | 0,8% | 0,6% | 0,7% | 0,4% | 0,9% | 7,1% |
+| E007 | 0,6% | 0,4% | 0,4% | 0,2% | 0,6% | 5,2% |
+
+Energia criada acima de 20 Hz, fold 1: 9,6% do resíduo (era 5,1%). Relativa à energia de entrada: 0,039% (era 0,032%), uma leve alta.
+
+Outras medições só com saudáveis:
+
+| Critério | E006 | E007 |
+|---|---|---|
+| Acima do limiar no treino, por fold (grupo das 15 / peso 0,90 / outros) | 14 / 40,6 / 8,4 | 14 / 40,8 / 8,2 |
+| Assimetria do erro dos saudáveis de treino | 9,65 | 9,51 |
+| η² velocidade / peso / módulo / irregularidade | 0,068 / 0,129 / 0,086 / 0,169 | 0,044 / 0,142 / 0,091 / 0,162 |
+
+### 8.2 Métricas globais
+
+| Métrica | E006 | E007 | Δ |
+|---|---|---|---|
+| Acurácia | 0,6215 ± 0,0127 | 0,6173 ± 0,0229 | −0,0042 |
+| Recall | 0,3211 ± 0,1160 | 0,3211 ± 0,1225 | 0 |
+| FPR | 0,0881 (119) | 0,0963 (130) | +0,0082 |
+| AUC agregada | 0,6454 | 0,6437 | −0,0017 |
+| Matriz de confusão | TN 1231 · FP 119 · FN 886 · TP 419 | TN 1220 · FP 130 · FN 886 · TP 419 | |
+
+### 8.3 Por severidade
+
+| Severidade | n | Recall E006 | Recall E007 | FPR E007 | AUC E006 | AUC E007 | FN E007 | Erro mediano danificado ÷ saudável E007 |
+|---|---|---|---|---|---|---|---|---|
+| 0,01 | 225 | 0,062 | 0,067 | 0,096 | 0,468 | 0,452 ± 0,061 | 210 | 1,00 |
+| 0,05 | 225 | 0,076 | 0,076 | 0,096 | 0,491 | 0,486 ± 0,054 | 208 | 1,01 |
+| 0,10 | 225 | 0,084 | 0,080 | 0,096 | 0,518 | 0,541 ± 0,060 | 207 | 1,02 |
+| 0,20 | 225 | 0,196 | 0,196 | 0,096 | 0,683 | 0,697 ± 0,065 | 181 | 1,17 |
+| 0,50 | 225 | 0,644 | 0,644 | 0,096 | 0,835 | 0,855 ± 0,060 | 80 | 2,47 |
+| 1,00 | 180 | 1,000 | 1,000 | 0,096 | 0,997 | 0,997 ± 0,004 | 0 | 19,5 |
+
+A razão de medianas compara com os saudáveis de irregularidade 1, no mesmo fold. No E006, ela era 1,16 (sev. 0,2), 2,33 (0,5) e 16,8 (1,0).
+
+FPR por peso de vagão do fold: 0,90 (folds 10–12) 23%–50%; demais pesos 0%–6%. Os folds 10–12 têm 104 dos 130 falsos positivos (eram 90 de 119). O grupo irregularidade 2 × módulo 0,975 gerou os mesmos 15 falsos positivos. FPR na irregularidade 1: 8,7%.
+
+### 8.4 Distribuição dos erros
+
+![Distribuição do erro por severidade](error_distribution.png)
 
 ## 9. Análise
 
+**Hipótese (seção 2): confirmada.** Sem a penalidade, os 4 canais do latente voltaram a ser usados no fold 1 e o MSE dos saudáveis de treino caiu 35% (0,0077 → 0,0050), com queda em todas as faixas da banda.
+
+**Quanto da esparsidade vinha da L1.** No fold 1, os zeros do latente caíram de 53,3% para 22,7%. Os ~23% restantes vêm só da ReLU; cerca de 30 pontos percentuais (mais da metade dos zeros do E006) eram efeito da penalidade. Era a L1 que matava canais: sem ela, nenhum canal morreu.
+
+**Avaliação (seção 4.2): nenhum dos dois cenários se realizou de forma clara.**
+- A separação relativa melhorou um pouco: o erro mediano da severidade 0,5 passou de 2,33× para 2,47× o dos saudáveis, e a AUC das severidades 0,2 (0,68 → 0,70) e 0,5 (0,835 → 0,855) subiu, dentro do desvio entre folds.
+- Os falsos negativos não mudaram (886 → 886; recall idêntico em todas as severidades a partir de 0,05). O ganho de separação não se traduziu em detecções, porque o limiar continua decidido pelo peso 0,90.
+- Severidades até 0,1 continuam com AUC ≈ 0,5, como previsto.
+
+**O peso 0,90 continua decidindo o limiar.** A razão de erro do peso 0,90 para os outros pesos subiu levemente (1,31 → 1,35), e a composição acima do limiar no treino é a mesma (14 do grupo das 15, ~41 de peso 0,90 e ~8 dos outros, por fold). O FPR dos folds 10–12 subiu (até 50%) e o FPR geral foi de 8,8% para 9,6%. É o terceiro experimento seguido (E004 → E006 → E007) em que melhorar a reconstrução não reduz essa diferença.
+
+**Energia fora da banda.** A energia criada acima de 20 Hz subiu um pouco (0,032% → 0,039% da entrada) e passou a ser 9,6% do resíduo. Sem a penalidade, o decoder recebe ativações maiores e menos esparsas; uma explicação possível é que os degraus do `UpSampling1D` ficam maiores, mas isso não foi verificado.
+
+**Limitação.** Canais ativos, zeros e espectro do resíduo foram medidos só no fold 1. O MSE de treino e a composição acima do limiar cobrem os 15 folds.
+
 ## 10. Decisão e próximos passos
+
+- **Critério da seção 4.3: atendido.** O MSE dos saudáveis de treino caiu (0,0050 < 0,0077) e o fold 1 tem mais canais ativos (4 de 4 > 2 de 4).
+- **Decisão: não adotada, por decisão do autor (2026-11-08).** O critério só com saudáveis foi atendido, mas adotar `l1_activity = 0` removeria a esparsidade buscada pelo treino, que faz parte do pedido inicial ("Conv1D esparso"). O autor preferiu manter alguma penalidade. O E007 fica como diagnóstico (a L1 de 1e-4 matava canais; a ReLU sozinha dá ~23% de zeros) e a base continua sendo o E006. Próximo passo: penalidade de 1e-5 ([E008](../E008_penalidade-l1-1e-5/README.md)).
+- **Variantes avaliadas nos folds de teste até aqui:** 7.
+
+Próximos experimentos possíveis, motivados só por saudáveis ou por raciocínio físico:
+- **Penalidade intermediária** (por exemplo 1e-5), se o autor quiser manter um modelo esparso sem matar canais. Critério: canais ativos e MSE dos saudáveis entre os do E006 e os do E007.
+- **Nyquist do latente.** A faixa de 16–20 Hz continua a pior (5,2%), acima do Nyquist do latente (16 Hz).
+- **Peso 0,90.** Três experimentos de reconstrução não reduziram a diferença; o limiar por peso de vagão continua reservado pelo autor como alternativa futura.
+- **Entrada espectral (PSD):** reservada pelo autor para depois do domínio do tempo.
 
 ## Notas posteriores
