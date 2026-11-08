@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Status | Proposto |
+| Status | Concluído |
 | Pai (base de comparação) | [E005](../E005_limiar-percentil-95/README.md) |
 | Proposto em | 2026-10-22 |
-| Executado em | — |
-| Código | — (commitar antes do run) |
+| Executado em | 2026-11-07 |
+| Código | commit `91c31ea` |
 
 ## 1. Motivação
 
@@ -109,10 +109,97 @@ Comandos (depois de commitar esta pasta):
 
 Duração estimada: até ~3h20 para o run principal (o E004 levou ~1h40 para ~1480 épocas, ~4 s por época; aqui são até 3000 épocas), menos se o early stopping agir cedo. O diagnóstico do resíduo leva cerca de 16 min.
 
+**Execução real (2026-11-07 a 08), em outra máquina do autor:**
+- Código: commit `91c31ea`, sem alterações pendentes em `src/` (registrado no `run.log`).
+- Run principal: das 18:22 de 07/11 às 00:41 de 08/11 (~6h20; máquina diferente, então o tempo não é comparável ao estimado).
+- **Falha parcial:** o `run.log` termina num `ModuleNotFoundError` ao gerar o gráfico, porque o `matplotlib` não estava declarado no `pyproject.toml`. O treino, as métricas globais, a tabela por severidade e os parquets foram gravados antes da falha; o gráfico e o diagnóstico do erro (AUC agregada, tabela por fold, η²) não.
+- **Recuperação:** o gráfico e o diagnóstico foram gerados depois a partir dos parquets, sem retreino, e estão em `report.log` e `error_distribution.png`. A tabela por severidade do `report.log` é idêntica à do `run.log`. O `matplotlib` foi declarado no projeto.
+- O early stopping parou os 15 folds, entre as épocas 85 e 189: 148, 106, 134, 182, 110, 97, 150, 85, 169, 189, 167, 112, 165, 102, 156.
+- Diagnóstico do resíduo (`residual_spectrum.txt`), rodado pelo autor: o limiar do fold 1 (0,0106) é igual ao do run, então o retreino reproduziu o fold 1.
+
 ## 8. Resultados
+
+### 8.1 Critérios só com saudáveis
+
+| Critério | E004/E005 | Previsão | E006 | Resultado |
+|---|---|---|---|---|
+| Mediana do melhor `val_loss` dos 15 folds | 0,0134 | 0,010–0,013 | 0,0117 (0,0100–0,0160), −13% | Confirmada |
+| Folds parados pelo early stopping | 2 de 15 | ≥ 8 de 15 | 15 de 15 | Confirmada |
+| Erro relativo total, fold 1 | 0,81% | Menor | 0,64% | Confirmada |
+| Parte não reconstruída de 16–20 Hz, fold 1 | 8,3% | Menor, ainda a pior faixa | 7,1%, ainda a pior faixa | Confirmada |
+| Erro mediano do peso 0,90 ÷ outros pesos | 1,29 (1,26–1,42) | Sem previsão | 1,31 (1,26–1,48) | Não mudou |
+| Acima do limiar no treino, por fold (grupo das 15 / peso 0,90 / outros) | 14 / 40 / ~9 | Sem previsão | 14 / 40,6 / 8,4 | Não mudou |
+| Saudáveis de treino acima do limiar | 5,0% | 5,0% | 5,0% | Confirmada (por construção) |
+
+Parte não reconstruída por faixa, fold 1:
+
+| Faixa (Hz) | 0–1 | 1–4 | 4–8 | 8–12 | 12–16 | 16–20 |
+|---|---|---|---|---|---|---|
+| E004 (100 épocas) | 0,9% | 0,7% | 0,9% | 0,5% | 1,1% | 8,3% |
+| E006 (200 épocas) | 0,8% | 0,6% | 0,7% | 0,4% | 0,9% | 7,1% |
+
+Outras medições, fold 1:
+
+| Critério | E004 | E006 |
+|---|---|---|
+| Fração do resíduo acima de 20 Hz | 4,7% | 5,1% |
+| Zeros no latente | 54,4% | 53,3% |
+| Canais ativos no latente | 3 de 4 | 2 de 4 |
+| Penalidade L1 ÷ MSE | 0,29 | 0,29 |
+
+η² do log-erro dos saudáveis de treino (E004 → E006): velocidade 0,062 → 0,068; peso 0,124 → 0,129; módulo 0,084 → 0,086; irregularidade 0,174 → 0,169.
+
+### 8.2 Métricas globais
+
+| Métrica | E005 | E006 | Δ |
+|---|---|---|---|
+| Acurácia | 0,6196 ± 0,0168 | 0,6215 ± 0,0127 | +0,0019 |
+| Recall | 0,3149 ± 0,1067 | 0,3211 ± 0,1160 | +0,0062 |
+| FPR | 0,0859 (116) | 0,0881 (119) | +0,0022 |
+| AUC agregada | 0,6409 | 0,6454 | +0,0045 |
+| Matriz de confusão | TN 1234 · FP 116 · FN 894 · TP 411 | TN 1231 · FP 119 · FN 886 · TP 419 | |
+
+### 8.3 Por severidade
+
+| Severidade | n | Recall E005 | Recall E006 | FPR E006 | AUC E005 | AUC E006 | FN E006 |
+|---|---|---|---|---|---|---|---|
+| 0,01 | 225 | 0,049 | 0,062 | 0,088 | 0,464 | 0,468 ± 0,057 | 211 |
+| 0,05 | 225 | 0,084 | 0,076 | 0,088 | 0,493 | 0,491 ± 0,040 | 208 |
+| 0,10 | 225 | 0,076 | 0,084 | 0,088 | 0,525 | 0,518 ± 0,059 | 206 |
+| 0,20 | 225 | 0,182 | 0,196 | 0,088 | 0,664 | 0,683 ± 0,066 | 181 |
+| 0,50 | 225 | 0,636 | 0,644 | 0,088 | 0,832 | 0,835 ± 0,057 | 80 |
+| 1,00 | 180 | 1,000 | 1,000 | 0,088 | 0,996 | 0,997 ± 0,005 | 0 |
+
+FPR por peso de vagão do fold: 0,90 (folds 10–12) 21%–43%; demais pesos 0%–10%. Os folds 10–12 têm 90 dos 119 falsos positivos. O grupo irregularidade 2 × módulo 0,975 gerou os mesmos 15 falsos positivos. FPR na irregularidade 1: 8,0%.
+
+### 8.4 Distribuição dos erros
+
+![Distribuição do erro por severidade](error_distribution.png)
+
+Os erros da severidade 1,0 vão de ~2× a ~200× o limiar; o eixo do painel da direita foi ajustado para mostrar essa faixa.
 
 ## 9. Análise
 
+**Hipótese (seção 2): confirmada.** O erro dos saudáveis caiu (mediana do melhor `val_loss` −13%; erro relativo do fold 1 de 0,81% para 0,64%), e o early stopping parou os 15 folds. Com 200 épocas, o treino agora termina por convergência, e não pelo limite de épocas.
+
+**Pergunta em aberto (peso 0,90): resposta negativa.** A razão de erro entre o peso 0,90 e os outros pesos ficou igual (1,29 → 1,31), e a composição do que fica acima do limiar no treino também (40 de peso 0,90 por fold). O resultado repete o precedente E001 → E002: mais treino melhora todos os pesos na mesma proporção, sem fechar a diferença. Por isso o limiar continua decidido pelo peso 0,90, e os pesos 0,95–1,10 continuam operando com α efetivo ≈ 1%.
+
+**Avaliação (seção 4.2): previsões confirmadas.**
+- AUC praticamente igual em todas as severidades (variações ≤ 0,02, dentro do desvio entre folds). Como no E002, a reconstrução melhorou na mesma medida para saudáveis e danificados.
+- Falsos negativos: 894 → 886, quase iguais, como esperado se a diferença do peso 0,90 não caísse. 625 dos 886 são das severidades até 0,1 (AUC ≈ 0,5).
+- FPR continua concentrado nos folds de peso 0,90.
+
+**Canais do latente.** No fold 1, só 2 dos 4 canais ficaram ativos (eram 3 no E004), com a penalidade L1 ainda em 29% do MSE. O latente útil caiu para ~456 valores, e a reconstrução ainda assim melhorou. Mais treino deu mais tempo para a penalidade matar canais. Medido só no fold 1.
+
 ## 10. Decisão e próximos passos
+
+- **Decisão:** adotada. A mediana do melhor `val_loss` (0,0117) é menor que a do E004 (0,0134), que é o critério da seção 4.3. A base passa a ser a arquitetura do E004, com limiar no percentil 95 e 200 épocas com early stopping.
+- **Variantes avaliadas nos folds de teste até aqui:** 6.
+
+O E006 confirma que mais reconstrução não muda a separação nem o problema do peso 0,90. Para reduzir FN, a mudança precisa alterar o que o score mede ou a regra do limiar. Candidatos, motivados só por saudáveis ou por raciocínio físico:
+- **Penalidade L1** (29% do MSE; 2 de 4 canais mortos no fold 1). Um run com `l1_activity` menor ou 0 testa se os canais revivem e quanto da esparsidade vem da penalidade. Efeito nos FN imprevisível.
+- **Nyquist do latente.** A faixa de 16–20 Hz continua a pior (7,1%), acima do Nyquist do latente (16 Hz). Reduzir o tempo só 4× levaria o Nyquist a 32 Hz.
+- **Limiar por peso de vagão:** reservado pelo autor como alternativa futura.
+- **Entrada espectral (PSD):** reservada pelo autor para depois do domínio do tempo.
 
 ## Notas posteriores
