@@ -1,0 +1,17 @@
+Experiment: outputs\autoencoders\E007_sem-penalidade-l1 | fold 1, healthy training samples only (1260)
+Threshold (fold 1): 0.0070
+Relative error (residual energy / input energy): 0.0041
+
+band (Hz) | input share | residual share | band not reconstructed | output/input energy
+  0-1      |   0.0245    |    0.0349      |   0.006                |   0.972
+  1-4      |   0.1405    |    0.1236      |   0.004                |   0.976
+  4-8      |   0.1946    |    0.1876      |   0.004                |   0.998
+  8-12     |   0.4982    |    0.2625      |   0.002                |   0.997
+ 12-16     |   0.1350    |    0.2108      |   0.006                |   0.994
+ 16-20     |   0.0067    |    0.0849      |   0.052                |   0.955
+ 20-32     |   0.0005    |    0.0550      |   n/a (no input)       |   n/a
+ 32-64     |   0.0000    |    0.0165      |   n/a (no input)       |   n/a
+ 64-128    |   0.0000    |    0.0242      |   n/a (no input)       |   n/a
+
+Latent shape (228, 4) (912 values), zeros: 0.227, active channels: 4/4
+L1 penalty / MSE: 0.0000
