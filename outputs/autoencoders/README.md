@@ -3,7 +3,7 @@
 Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_template.md`.
 
 - **Base atual:** E006 (arquitetura do E004, limiar no percentil 95, 200 épocas com early stopping).
-- **Variantes avaliadas nos folds de teste até aqui:** 6 (E001–E006).
+- **Variantes avaliadas nos folds de teste até aqui:** 7 (E001–E007).
 
 | ID | Título | Pai | Mudança | Hipótese (resumo) | Resultado principal | Decisão | Status |
 |---|---|---|---|---|---|---|---|
@@ -13,4 +13,5 @@ Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_temp
 | [E004](E004_pooling-2x2x2/README.md) | pooling-2x2x2 | E003 | `pool_sizes` [4,4,2] → [2,2,2] (redução no tempo 32× → 8×), mantendo latente (912) e campo receptivo (≥ 128); 100 épocas | Menos redução no tempo reduz a energia criada fora da banda e o erro em 12–20 Hz | `val_loss` 0,0907 → 0,0134 (contra E003 com 100 épocas); AUC sev. 0,2: 0,66; 0,5: 0,83; até 0,1 ainda ~0,5; FPR 1,6% | Adotada (resíduo fora da banda, `val_loss`) | Concluído |
 | [E005](E005_limiar-percentil-95/README.md) | limiar-percentil-95 | E004 | Limiar μ + 1σ → percentil 95 dos saudáveis de treino (sem retreino) | O percentil fixa em 5% a fração de saudáveis de treino acima do limiar | 5% em todos os folds; FPR 8,6% (84 de 116 FP nos folds de peso 0,90); recall sev. 0,2: 18%, 0,5: 64%; AUC igual | Adotada (decisão de projeto: α = 5%) | Concluído |
 | [E006](E006_200-epocas-pooling-2x2x2/README.md) | 200-epocas-pooling-2x2x2 | E005 | `epochs` 100 → 200 | O `val_loss` do E004 ainda caía; mais épocas reduzem o erro dos saudáveis e o early stopping passa a agir | `val_loss` 0,0134 → 0,0117; early stopping em 15 de 15 folds; peso 0,90 ÷ outros igual (1,31); FN 894 → 886; AUC igual | Adotada (`val_loss`) | Concluído |
-| [E007](E007_sem-penalidade-l1/README.md) | sem-penalidade-l1 | E006 | `l1_activity` 1e-4 → 0 | Sem a penalidade (29% do MSE), os canais mortos do latente revivem e o erro dos saudáveis cai | — | — | Proposto |
+| [E007](E007_sem-penalidade-l1/README.md) | sem-penalidade-l1 | E006 | `l1_activity` 1e-4 → 0 | Sem a penalidade (29% do MSE), os canais mortos do latente revivem e o erro dos saudáveis cai | MSE saudáveis 0,0077 → 0,0050; 4 de 4 canais ativos (eram 2); zeros 53% → 23%; FN 886 → 886; AUC sev. 0,5: 0,835 → 0,855 | Não adotada (autor quer manter penalidade L1); diagnóstico | Concluído |
+| [E008](E008_penalidade-l1-1e-5/README.md) | penalidade-l1-1e-5 | E006 | `l1_activity` 1e-4 → 1e-5 | Com penalidade 10× menor, nenhum canal morre e o erro dos saudáveis fica abaixo do E006, com latente mais esparso que no E007 | — | — | Proposto |
