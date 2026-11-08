@@ -120,7 +120,8 @@ def plot_error_distribution(test_df: pd.DataFrame, path: str) -> None:
     # Rótulos simples no eixo log: os automáticos se sobrepõem.
     ax_cdf.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%g"))
     ax_cdf.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-    ax_cdf.set_xticks([0.3, 0.5, 0.7, 1, 1.5, 2, 3, 5, 7])
+    ticks = np.array([0.3, 0.5, 0.7, 1, 1.5, 2, 3, 5, 7, 10, 20, 50, 100, 200, 500, 1000])
+    ax_cdf.set_xticks(ticks[(ticks >= ratio.min() * 0.8) & (ticks <= ratio.max() * 1.25)])
     ax_cdf.axvline(1, color="red", ls="--", lw=1)
     ax_cdf.set_xlabel("reconstruction error / fold threshold (log)")
     ax_cdf.set_ylabel("cumulative fraction of samples")
