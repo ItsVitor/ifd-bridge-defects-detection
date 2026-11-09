@@ -59,3 +59,31 @@ Copy-Item config\autoencoders.yaml outputs\autoencoders\E004_slug\config.yaml
 # editar config.yaml e README.md; revisar; commitar o código
 .venv\Scripts\python.exe src\test_autoencoders.py outputs\autoencoders\E004_slug *> outputs\autoencoders\E004_slug\run.log
 ```
+
+### Na GPU (WSL2)
+
+O TensorFlow 2.20 não usa GPU no Windows nativo (a 2.10 foi a última versão com esse suporte). Com uma placa NVIDIA, o treino roda na GPU dentro do WSL2 (Ubuntu), num ambiente separado do `.venv` do Windows. Na GTX 1650 do notebook do autor, uma época levou ~1,6–1,8 s, contra ~4,6–5,6 s na CPU.
+
+Preparação, uma vez, no terminal do Ubuntu:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+cd /mnt/c/Users/vitor/OneDrive/Documentos/GitHub/ifd-bridge-defects-detection
+uv export --frozen --no-hashes --no-emit-project -o /tmp/ifd-req.txt
+uv venv --python 3.13 ~/venvs/ifd-bridge-gpu
+VIRTUAL_ENV=~/venvs/ifd-bridge-gpu uv pip install -r /tmp/ifd-req.txt "tensorflow[and-cuda]==2.20.0"
+```
+
+Carregar todos os dados chega a ~15 GB de RAM; o WSL usa metade da RAM por padrão. O limite fica em `%UserProfile%\.wslconfig` (`[wsl2]` / `memory=24GB`), aplicado com `wsl --shutdown`.
+
+Execução, no terminal do Ubuntu:
+
+```bash
+cd /mnt/c/Users/vitor/OneDrive/Documentos/GitHub/ifd-bridge-defects-detection
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=true \
+  ~/venvs/ifd-bridge-gpu/bin/python src/test_autoencoders.py outputs/autoencoders/E012_slug \
+  > outputs/autoencoders/E012_slug/run.log 2>&1
+```
+
+- As variáveis `GIT_CONFIG_*` fazem o git do Ubuntu tratar o fim de linha como o git do Windows (`core.autocrlf=true`), sem alterar a configuração do git. Sem elas, o `run.log` registra um falso aviso de alterações não commitadas em `src/`.
+- Na GPU, o `train_model` liga o determinismo das operações (`tf.config.experimental.enable_op_determinism()`), e o `run.log` registra o dispositivo na linha `Device:`. Com isso, dois runs iguais na GPU dão os mesmos números. Os resultados na GPU não são idênticos aos da CPU: comparar experimentos rodados em dispositivos diferentes mistura a troca de dispositivo com a mudança testada.
