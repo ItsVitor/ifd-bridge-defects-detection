@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from scipy.signal import welch
 from tensorflow import keras
 from tqdm import tqdm
@@ -318,6 +319,10 @@ class AutoencoderPipeline(BridgeDefectPipeline):
             ThresholdedAutoencoder: Modelo treinado com o limiar calculado.
         """
         keras.utils.set_random_seed(self.random_state)
+        # Na GPU, a semente não basta: as convoluções do cuDNN variam entre execuções.
+        # Só na GPU, para não alterar os resultados dos runs em CPU já registrados.
+        if tf.config.list_physical_devices("GPU"):
+            tf.config.experimental.enable_op_determinism()
         X_healthy = X_train[y_train == 0]
         # Embaralha antes do fit: o validation_split do Keras pega as últimas amostras,
         # que estão ordenadas por arquivo/experimento.

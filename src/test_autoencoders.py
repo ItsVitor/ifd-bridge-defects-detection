@@ -6,6 +6,7 @@ import subprocess
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.metrics import roc_auc_score
 
 from autoencoders_pipeline import RESIDUAL_BANDS, AutoencoderPipeline
@@ -231,6 +232,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"\nExperiment: {experiment_dir}")
     print(f"Code revision: {git_revision()}")
+    gpus = tf.config.list_physical_devices("GPU")
+    print(f"Device: {'GPU ' + str([g.name for g in gpus]) + ', op determinism on' if gpus else 'CPU only'}")
     print(
         f"\nHyperparameters: filters={pipeline.encoder_filters}, pools={pipeline.pool_sizes}, "
         f"kernel={pipeline.kernel_size}, l1={pipeline.l1_activity}, lr={pipeline.learning_rate}, "
