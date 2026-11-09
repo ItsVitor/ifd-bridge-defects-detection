@@ -3,7 +3,7 @@
 Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_template.md`.
 
 - **Base atual:** E008 (arquitetura do E004, limiar no percentil 95, 200 épocas com early stopping, `l1_activity = 1e-5`).
-- **Variantes avaliadas nos folds de teste até aqui:** 8 (E001–E008).
+- **Variantes avaliadas nos folds de teste até aqui:** 9 (E001–E009).
 
 | ID | Título | Pai | Mudança | Hipótese (resumo) | Resultado principal | Decisão | Status |
 |---|---|---|---|---|---|---|---|
@@ -15,4 +15,4 @@ Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_temp
 | [E006](E006_200-epocas-pooling-2x2x2/README.md) | 200-epocas-pooling-2x2x2 | E005 | `epochs` 100 → 200 | O `val_loss` do E004 ainda caía; mais épocas reduzem o erro dos saudáveis e o early stopping passa a agir | `val_loss` 0,0134 → 0,0117; early stopping em 15 de 15 folds; peso 0,90 ÷ outros igual (1,31); FN 894 → 886; AUC igual | Adotada (`val_loss`) | Concluído |
 | [E007](E007_sem-penalidade-l1/README.md) | sem-penalidade-l1 | E006 | `l1_activity` 1e-4 → 0 | Sem a penalidade (29% do MSE), os canais mortos do latente revivem e o erro dos saudáveis cai | MSE saudáveis 0,0077 → 0,0050; 4 de 4 canais ativos (eram 2); zeros 53% → 23%; FN 886 → 886; AUC sev. 0,5: 0,835 → 0,855 | Não adotada (autor quer manter penalidade L1); diagnóstico | Concluído |
 | [E008](E008_penalidade-l1-1e-5/README.md) | penalidade-l1-1e-5 | E006 | `l1_activity` 1e-4 → 1e-5 | Com penalidade 10× menor, nenhum canal morre e o erro dos saudáveis fica abaixo do E006, com latente mais esparso que no E007 | MSE saudáveis 0,0077 → 0,0067; 4 de 4 canais ativos; zeros 45%; penalidade ainda 23% do MSE (previsto 3–10%); FN 886 → 884; FPR 10,2% | Adotada (MSE saudáveis, canais ativos) | Concluído |
-| [E009](E009_nyquist-latente-32hz/README.md) | nyquist-latente-32hz | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), filtros da última camada do encoder 4 → 2 (latente mantido em 912) | Com o latente a 64 amostras/s (Nyquist 32 Hz), 16–20 Hz e a energia criada acima de 20 Hz diminuem | — | — | Proposto |
+| [E009](E009_nyquist-latente-32hz/README.md) | nyquist-latente-32hz | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), filtros da última camada do encoder 4 → 2 (latente mantido em 912) | Com o latente a 64 amostras/s (Nyquist 32 Hz), 16–20 Hz e a energia criada acima de 20 Hz diminuem | MSE saudáveis 0,0067 → 0,0076; 1 de 2 canais ativos; 16–20 Hz 7,6% → 5,3% só no fold 1 (atípico); FN 884 → 906; FPR 9,0% | Não adotada (MSE saudáveis, canal morto) | Concluído |
