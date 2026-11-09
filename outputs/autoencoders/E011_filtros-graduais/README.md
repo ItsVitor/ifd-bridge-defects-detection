@@ -3,10 +3,12 @@
 | Campo | Valor |
 |---|---|
 | Status | Proposto |
-| Pai (base de comparação) | [E010](../E010_nyquist-latente-4-canais/README.md) |
-| Proposto em | 2026-11-09 |
+| Pai (base de comparação) | [E010](../E010_nyquist-latente-4-canais/README.md) (configuração); [E012](../E012_e010-na-gpu/README.md) (mesma configuração na GPU, referência numérica) |
+| Proposto em | 2026-11-09 (ajustado antes do run em 2026-11-09: execução na GPU, comparação com o E012) |
 | Executado em | — |
 | Código | — (commitar antes do run) |
+
+**Ajuste antes do run (2026-11-09).** Uma primeira execução na CPU foi interrompida pelo autor antes de terminar, sem resultados registrados. O experimento passa a rodar na GPU (WSL2), e a referência numérica deixa de ser o E010 (CPU) e passa a ser o E012, que roda a configuração do E010 na GPU. Os valores do E010 continuam nas tabelas como contexto. A mudança testada, a hipótese e a configuração não mudaram; só a referência de comparação, o critério da seção 4.3 e o comando da seção 7.
 
 ## 1. Motivação
 
@@ -60,9 +62,9 @@ Sem mudanças de código. O decoder é o espelho do encoder, então ele também 
 
 ### 4.1 Critérios só com saudáveis
 
-Todas as medidas de espectro e latente vêm de `residual_spectrum.txt` (mediana e faixa dos 15 folds), comparáveis diretamente com o E010.
+Todas as medidas de espectro e latente vêm de `residual_spectrum.txt` (mediana e faixa dos 15 folds). A coluna abaixo traz os valores do E010 (CPU) como contexto; a comparação que decide é com o E012 (mesma configuração na GPU), que roda antes. As previsões relativas ("igual", "até 10% maior") valem em relação ao E012.
 
-| Critério | E010 | Previsão para o E011 |
+| Critério | E010 (CPU) | Previsão para o E011 |
 |---|---|---|
 | Mediana, entre folds, do MSE médio dos saudáveis de treino | 0,0033 (0,0028–0,0047) | Igual ou até 10% maior (≤ 0,0036) |
 | Canais ativos no latente | 4 de 4 em 13 folds; 3 de 4 nos folds 1 e 4 | 4 de 4 em todos os folds |
@@ -82,12 +84,14 @@ Sem previsão de direção para a AUC e os falsos negativos. Se a reconstrução
 ### 4.3 Critério de adoção
 
 Adotar `encoder_filters = [32, 16, 4]` na base se as duas condições valerem:
-1. A mediana, entre folds, do MSE médio dos saudáveis de treino não for maior que a do E010 (0,0033, com 4 casas decimais).
+1. A mediana, entre folds, do MSE médio dos saudáveis de treino não for maior que a do E012 somada à margem de variação de execução medida no E012 (diferença entre as medianas do E010 e do E012).
 2. A mediana, entre folds, de canais ativos no latente for 4 de 4.
 
-A adoção se justifica por parcimônia: mesmo erro com 34% menos parâmetros. Se o MSE subir, o E010 continua a base, mesmo que os canais mortos desapareçam.
+Se o E012 mostrar uma variação de execução acima de 10% (seção 4.3 do E012), este critério é rediscutido com o autor antes de rodar o E011.
 
-**Limite conhecido do critério.** O MSE dos saudáveis não antecipa a detecção (E002, E006, E007 e E008), e a comparação "não maior" depende de uma única semente, sem estimativa da variação entre treinos. A métrica de teste é só reportada e não decide.
+A adoção se justifica por parcimônia: mesmo erro com 34% menos parâmetros. Se o MSE subir além da margem, o E010 continua a base, mesmo que os canais mortos desapareçam.
+
+**Limite conhecido do critério.** O MSE dos saudáveis não antecipa a detecção (E002, E006, E007 e E008). A margem vem de uma única comparação CPU × GPU, e não de várias sementes, então é só uma primeira estimativa da variação entre treinos. A métrica de teste é só reportada e não decide.
 
 ## 5. Configuração e origem de cada escolha
 
@@ -124,15 +128,20 @@ Igual ao E010, exceto a linha marcada.
 
 ## 7. Execução
 
-Comando (depois de commitar esta pasta). O espectro do resíduo de todos os folds sai no mesmo run:
+Rodar depois do E012 e de commitar esta pasta. No terminal do Ubuntu (WSL2); o espectro do resíduo de todos os folds sai no mesmo run:
 
-```powershell
-.venv\Scripts\python.exe src\test_autoencoders.py outputs\autoencoders\E011_filtros-graduais *> outputs\autoencoders\E011_filtros-graduais\run.log
+```bash
+cd /mnt/c/Users/vitor/OneDrive/Documentos/GitHub/ifd-bridge-defects-detection
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=true \
+  ~/venvs/ifd-bridge-gpu/bin/python src/test_autoencoders.py outputs/autoencoders/E011_filtros-graduais \
+  > outputs/autoencoders/E011_filtros-graduais/run.log 2>&1
 ```
 
-Antes de rodar em outra máquina: `uv sync`.
+A linha `Device:` do `run.log` deve dizer `GPU [...], op determinism on`. Preparação do ambiente: `docs/experiments.md`, seção "Na GPU (WSL2)".
 
-Duração estimada: o teto é de 3000 épocas (15 folds × 200). O E010 somou 2112 épocas (duração não registrada; o E009, com custo por época parecido, levou ~3h45 para 2398 épocas). O custo por época do E011 deve ser um pouco menor que o do E010 (seção 3), mas o ponto de parada pode mudar.
+Duração estimada: o teto é de 3000 épocas (15 folds × 200); o E010 somou 2112. Na GPU com determinismo, o modelo `[32, 16, 4]` levou 1,6 s/época na medição com dados sintéticos (contra 4,6 s na CPU do notebook): ~1 h para ~2100 épocas, mais ~3–4 min de carregamento dos dados.
+
+**Primeira tentativa (2026-11-09):** iniciada na CPU e interrompida pelo autor antes de terminar, para passar a rodar na GPU. Nenhum resultado foi gravado.
 
 ## 8. Resultados
 
