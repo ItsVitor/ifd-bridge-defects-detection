@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Status | Proposto |
+| Status | Concluído |
 | Pai (base de comparação) | [E008](../E008_penalidade-l1-1e-5/README.md) |
 | Proposto em | 2026-11-08 |
-| Executado em | — |
-| Código | — (commitar antes do run) |
+| Executado em | 2026-11-08 |
+| Código | commit `de75621` |
 
 ## 1. Motivação
 
@@ -131,10 +131,110 @@ Antes de rodar em outra máquina: `uv sync`.
 
 Duração estimada: o teto é de 3000 épocas (15 folds × 200). O E008 somou 1939 épocas e o E009, 2398 (~3h45). O custo por época deve ser parecido com o do E008 (seção 3); o diagnóstico em todos os folds acrescenta poucos segundos por fold.
 
+**Execução real (2026-11-08), em outra máquina do autor:**
+- Código: commit `de75621` (registrado no `run.log`), sem aviso de alterações pendentes em `src/`.
+- Run completo, sem erros; o gráfico e o diagnóstico do resíduo (`residual_spectrum.txt` e `.parquet`) foram gerados normalmente.
+- O `run.log` começa às 23:22; a duração exata não foi registrada (os arquivos foram gravados na pasta às 10:02 do dia seguinte, na cópia entre máquinas).
+- Épocas por fold: 168, 125, 114, 178, 187, 97, 140, 186, 140, 85, 149, 161, 119, 133, 130 (2112 no total, contra 1939 no E008 e 2398 no E009). O early stopping parou os 15 folds; nenhum chegou ao teto.
+
 ## 8. Resultados
+
+### 8.1 Critérios só com saudáveis
+
+As medidas de espectro e latente do E010 são a mediana (mínimo–máximo) dos 15 folds. As do E008 e do E009 são só do fold 1. Para uma comparação justa, a coluna "E010 fold 1" repete a medida no mesmo fold.
+
+| Critério | E008 | E009 | Previsão | E010 (15 folds) | E010 fold 1 | Resultado |
+|---|---|---|---|---|---|---|
+| Mediana, entre folds, do MSE médio dos saudáveis de treino | 0,0067 (0,0050–0,0079) | 0,0076 | Menor que 0,0067 | 0,0033 (0,0028–0,0047), −51% | 0,0030 | Confirmada |
+| Parte não reconstruída de 16–20 Hz | 7,6% (fold 1) | 5,3% (fold 1) | Mediana menor que 5% | 3,1% (2,7–4,4%) | 2,7% | Confirmada |
+| Energia criada fora da banda, relativa à entrada | 0,042% (fold 1) | 0,033% (fold 1) | Mediana menor que 0,042% | 0,02% (0,01–0,03%) | 0,02% | Confirmada |
+| Canais ativos no latente | 4 de 4 (fold 1) | 1 de 2 (fold 1) | 4 de 4 em todos os folds | 4 de 4 em 13 folds; 3 de 4 nos folds 1 e 4 | 3 de 4 | Refutada |
+| Zeros no latente | 45,0% (fold 1) | 51,6% (fold 1) | Sem previsão | 29,3% (26,3–32,1%) | 29,9% | — |
+| Penalidade L1 ÷ MSE | 0,23 (fold 1) | 0,19 (fold 1) | Sem previsão | 0,38 (0,35–0,40) | 0,37 | — |
+| Erro do peso 0,90 ÷ outros pesos (mediana entre folds) | 1,34 (1,26–1,47) | 1,43 (1,34–1,60) | ≈ 1,3–1,4 | 1,27 (1,23–1,41) | — | Refutada por pouco (abaixo da faixa) |
+| Folds parados pelo early stopping | 15 de 15 | 11 de 15 | Maioria | 15 de 15 | — | Confirmada |
+
+O `val_loss` tem o mesmo coeficiente L1 do E008 e do E009, então a comparação é justa: mediana do melhor valor dos 15 folds 0,0050 (0,0040–0,0073), contra 0,0088 no E008 e 0,0105 no E009.
+
+Parte não reconstruída por faixa:
+
+| Faixa (Hz) | 0–1 | 1–4 | 4–8 | 8–12 | 12–16 | 16–20 |
+|---|---|---|---|---|---|---|
+| E008, fold 1 | 0,8% | 0,6% | 0,6% | 0,4% | 0,9% | 7,6% |
+| E010, fold 1 | 0,44% | 0,24% | 0,26% | 0,12% | 0,35% | 2,7% |
+| E010, mediana dos 15 folds | 0,49% | 0,29% | 0,29% | 0,14% | 0,37% | 3,1% |
+
+No fold 1, a perda caiu 1,8–3,3× em todas as faixas; em 16–20 Hz, 2,8×. A faixa de 16–20 Hz continua a pior, 6–22 vezes pior que as outras na mediana dos folds.
+
+Erro relativo total: mediana 0,27% (0,22–0,38%); fold 1 0,24% (E008: 0,62%).
+
+**Latente.** Nos folds 1 e 4, um dos 4 canais ficou sempre em zero. No fold 1, os 29,9% de zeros correspondem a 25 pontos do canal morto e ~6,6% de zeros nos 3 canais ativos.
+
+Outras medições só com saudáveis:
+
+| Critério | E008 | E009 | E010 |
+|---|---|---|---|
+| Acima do limiar no treino, por fold (grupo das 15 / peso 0,90 / outros) | 14 / 40,5 / 8,5 | 14 / 36,4 / 12,6 | 14 / 40,8 / 8,2 |
+| Assimetria do erro dos saudáveis de treino (média entre folds) | 9,36 | 9,36 | 9,44 |
+| η² velocidade / peso / módulo / irregularidade | 0,048 / 0,136 / 0,089 / 0,168 | 0,033 / 0,144 / 0,083 / 0,162 | 0,043 / 0,124 / 0,089 / 0,172 |
+| Erro médio dos saudáveis de treino por módulo (0,975 / 1,000 / 1,025) | 0,0082 / 0,0054 / 0,0059 | 0,0104 / 0,0062 / 0,0069 | 0,0042 / 0,0029 / 0,0031 |
+
+### 8.2 Métricas globais
+
+| Métrica | E008 | E009 | E010 |
+|---|---|---|---|
+| Acurácia | 0,6154 ± 0,0210 | 0,6132 ± 0,0278 | 0,6301 ± 0,0205 |
+| Recall | 0,3226 ± 0,1241 | 0,3057 ± 0,0929 | 0,3172 ± 0,0889 |
+| FPR | 0,1015 (137) | 0,0896 (121) | 0,0674 (91) |
+| AUC agregada | 0,6483 | 0,6359 | 0,6600 |
+| Matriz de confusão | TN 1213 · FP 137 · FN 884 · TP 421 | TN 1229 · FP 121 · FN 906 · TP 399 | TN 1259 · FP 91 · FN 891 · TP 414 |
+
+### 8.3 Por severidade
+
+| Severidade | n | Recall E008 | Recall E010 | AUC E008 | AUC E009 | AUC E010 | FN E008 | FN E010 | Erro mediano danificado ÷ saudável (E008 / E009 / E010) |
+|---|---|---|---|---|---|---|---|---|---|
+| 0,01 | 225 | 0,067 | 0,031 | 0,466 | 0,415 | 0,456 ± 0,055 | 210 | 218 | 1,00 / 0,97 / 0,98 |
+| 0,05 | 225 | 0,084 | 0,062 | 0,503 | 0,481 | 0,499 ± 0,044 | 206 | 211 | 1,00 / 0,99 / 1,01 |
+| 0,10 | 225 | 0,080 | 0,062 | 0,544 | 0,555 | 0,598 ± 0,061 | 207 | 211 | 1,03 / 1,03 / 1,07 |
+| 0,20 | 225 | 0,200 | 0,240 | 0,707 | 0,672 | 0,746 ± 0,073 | 180 | 171 | 1,17 / 1,15 / 1,26 |
+| 0,50 | 225 | 0,640 | 0,644 | 0,848 | 0,848 | 0,846 ± 0,048 | 81 | 80 | 2,40 / 2,44 / 3,72 |
+| 1,00 | 180 | 1,000 | 1,000 | 0,997 | 0,995 | 0,998 ± 0,004 | 0 | 0 | 17,7 / 18,1 / 26,2 |
+
+FPR de todos os saudáveis de teste no E010: 0,067. Razão de medianas: mediana, entre folds, da razão entre o erro mediano dos danificados e o dos saudáveis de irregularidade 1 do mesmo fold (mesmo método do E008 e do E009).
+
+FPR por peso de vagão do fold: 0,90 (folds 10–12) 10%–39% (eram 24%–53% no E008); demais pesos 0%–6% (o fold 7, que tinha 13% no E008, caiu para 4%). Os folds 10–12 têm 68 dos 91 falsos positivos. O grupo irregularidade 2 × módulo 0,975 gerou os mesmos 15 falsos positivos. FPR na irregularidade 1: 5,8% (era 9,4%).
+
+### 8.4 Distribuição dos erros
+
+![Distribuição do erro por severidade](error_distribution.png)
 
 ## 9. Análise
 
+**Hipótese (seção 2): confirmada no resultado; o mecanismo do Nyquist não foi isolado.** O MSE dos saudáveis caiu pela metade (0,0067 → 0,0033) e a perda em 16–20 Hz caiu para 3,1% (mediana dos folds). Mas, no fold 1, a queda foi parecida em todas as faixas (1,8–3,3×), e não concentrada acima de 16 Hz, e a faixa de 16–20 Hz continua 6–22 vezes pior que as outras. A melhora parece vir da resolução no tempo e do latente maior em geral, e não especificamente de o Nyquist ter passado de 16 para 32 Hz. O latente dobrou junto (seção 3), então os dois efeitos continuam confundidos.
+
+**O problema do E009 eram os 2 canais.** Com a mesma resolução no tempo, passar de 2 para 4 canais (E009 → E010) levou o MSE de 0,0076 para 0,0033. A piora do E009 vinha do gargalo de 2 canais ReLU, e não da resolução no tempo.
+
+**Canais mortos voltaram em 2 folds.** Nos folds 1 e 4, um canal ficou sempre em zero, o que a previsão (4 de 4 em todos) não esperava. A penalidade L1 passou a pesar mais em relação ao MSE (0,23 → 0,38 no fold 1), porque o MSE caiu mais que a soma das ativações. Com 1e-5, a penalidade ainda mata canais em parte dos folds. Mesmo com um canal morto, esses dois folds estão entre os de menor MSE (0,0030 e 0,0029).
+
+**Avaliação (seção 4.2): o cenário "o latente mais fino ajuda" se realizou.** A separação entre danificados e saudáveis aumentou em todas as severidades a partir de 0,1: o erro mediano da severidade 0,5 passou de 2,40× para 3,72× o dos saudáveis, e o da 0,2, de 1,17× para 1,26×. Não houve sinal de que o latente maior reconstrua melhor o dano. A AUC subiu na severidade 0,1 (0,544 → 0,598) e na 0,2 (0,707 → 0,746), as duas dentro de ~1 desvio entre folds, e a agregada foi a maior até aqui (0,660).
+
+**Falsos negativos.** O total ficou praticamente igual (884 → 891). A severidade 0,2 ganhou 9 detecções (180 → 171 FN); as severidades até 0,1 perderam 17, onde a AUC continua ≈ 0,5 e a detecção é efetivamente sorteio. O que mudou foi o ponto de operação: o FPR caiu de 10,2% para 6,7%, mais perto dos 5% definidos no treino, e a queda veio principalmente dos folds de peso 0,90 (103 → 68 falsos positivos). Com a mesma regra de limiar (α = 5%), a melhor separação virou menos alarmes falsos, e não mais detecções.
+
+**O peso 0,90.** Pela primeira vez a razão de erro do peso 0,90 para os outros pesos caiu (1,34 → 1,27), e o FPR dos folds 10–12 caiu junto. A composição acima do limiar no treino não mudou (14 / 40,8 / 8,2 por fold): o limiar continua na cauda do peso 0,90, mas essa cauda ficou mais perto dos outros pesos.
+
+**Ressalva sobre múltiplas variantes.** Este é o 10º modelo avaliado nos mesmos folds de teste. Os ganhos de AUC estão dentro do desvio entre folds e precisam ser lidos com isso em mente.
+
 ## 10. Decisão e próximos passos
+
+- **Critério da seção 4.3: atendido.** O MSE dos saudáveis de treino caiu (0,0033 < 0,0067) e a mediana de canais ativos é 4 de 4.
+- **Decisão: adotada.** `pool_sizes = [2, 2, 1]` substitui `[2, 2, 2]` na base, que passa a ser o E010 (latente de 456 × 4 = 1824 valores, compressão de 16×).
+- **Variantes avaliadas nos folds de teste até aqui:** 10.
+
+Próximos experimentos possíveis, motivados só por saudáveis ou por raciocínio físico:
+- **Canais mortos com L1 = 1e-5.** Dois folds perderam um canal, e a penalidade passou a 38% do MSE. Um coeficiente menor (por exemplo 3e-6) testaria se os canais param de morrer mantendo o latente esparso.
+- **Filtros graduais no encoder** (`[32, 16, 4]`), discutido antes: distribui a compressão entre os blocos 2 e 3.
+- **A faixa de 16–20 Hz** continua 6–22 vezes pior que as outras. Ela tem só 0,7% da energia de entrada, então pesa pouco no MSE total; não está claro se vale atacá-la diretamente.
+- **Ponto de operação.** O FPR caiu para 6,7% sem ganho de FN. A escolha de α (hoje 5%) é do autor, e a relação entre α e FN pode ser avaliada sem retreino com `src/rethreshold.py`.
+- **Peso 0,90** (limiar por peso) e **entrada espectral (PSD)** continuam reservados pelo autor.
 
 ## Notas posteriores

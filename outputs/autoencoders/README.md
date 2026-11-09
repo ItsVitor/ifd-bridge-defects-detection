@@ -2,8 +2,8 @@
 
 Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_template.md`.
 
-- **Base atual:** E008 (arquitetura do E004, limiar no percentil 95, 200 épocas com early stopping, `l1_activity = 1e-5`).
-- **Variantes avaliadas nos folds de teste até aqui:** 9 (E001–E009).
+- **Base atual:** E010 (pools `[2, 2, 1]`, filtros `[32, 32, 4]`, kernel 19, latente 456 × 4, `l1_activity = 1e-5`, limiar no percentil 95, 200 épocas com early stopping).
+- **Variantes avaliadas nos folds de teste até aqui:** 10 (E001–E010).
 
 | ID | Título | Pai | Mudança | Hipótese (resumo) | Resultado principal | Decisão | Status |
 |---|---|---|---|---|---|---|---|
@@ -16,4 +16,4 @@ Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_temp
 | [E007](E007_sem-penalidade-l1/README.md) | sem-penalidade-l1 | E006 | `l1_activity` 1e-4 → 0 | Sem a penalidade (29% do MSE), os canais mortos do latente revivem e o erro dos saudáveis cai | MSE saudáveis 0,0077 → 0,0050; 4 de 4 canais ativos (eram 2); zeros 53% → 23%; FN 886 → 886; AUC sev. 0,5: 0,835 → 0,855 | Não adotada (autor quer manter penalidade L1); diagnóstico | Concluído |
 | [E008](E008_penalidade-l1-1e-5/README.md) | penalidade-l1-1e-5 | E006 | `l1_activity` 1e-4 → 1e-5 | Com penalidade 10× menor, nenhum canal morre e o erro dos saudáveis fica abaixo do E006, com latente mais esparso que no E007 | MSE saudáveis 0,0077 → 0,0067; 4 de 4 canais ativos; zeros 45%; penalidade ainda 23% do MSE (previsto 3–10%); FN 886 → 884; FPR 10,2% | Adotada (MSE saudáveis, canais ativos) | Concluído |
 | [E009](E009_nyquist-latente-32hz/README.md) | nyquist-latente-32hz | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), filtros da última camada do encoder 4 → 2 (latente mantido em 912) | Com o latente a 64 amostras/s (Nyquist 32 Hz), 16–20 Hz e a energia criada acima de 20 Hz diminuem | MSE saudáveis 0,0067 → 0,0076; 1 de 2 canais ativos; 16–20 Hz 7,6% → 5,3% só no fold 1 (atípico); FN 884 → 906; FPR 9,0% | Não adotada (MSE saudáveis, canal morto) | Concluído |
-| [E010](E010_nyquist-latente-4-canais/README.md) | nyquist-latente-4-canais | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), mantendo 4 canais (latente 912 → 1824) | Com o latente a 64 amostras/s sem o gargalo de 2 canais do E009, o erro dos saudáveis e a perda em 16–20 Hz caem | — | — | Proposto |
+| [E010](E010_nyquist-latente-4-canais/README.md) | nyquist-latente-4-canais | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), mantendo 4 canais (latente 912 → 1824) | Com o latente a 64 amostras/s sem o gargalo de 2 canais do E009, o erro dos saudáveis e a perda em 16–20 Hz caem | MSE saudáveis 0,0067 → 0,0033; 16–20 Hz 3,1% (mediana dos folds); canal morto em 2 de 15 folds; FN 884 → 891; FPR 10,2% → 6,7%; AUC sev. 0,2: 0,71 → 0,75 | Adotada (MSE saudáveis, canais ativos) | Concluído |
