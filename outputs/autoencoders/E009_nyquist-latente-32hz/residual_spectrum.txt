@@ -1,0 +1,17 @@
+Experiment: outputs\autoencoders\E009_nyquist-latente-32hz | fold 1, healthy training samples only (1260)
+Threshold (fold 1): 0.0088
+Relative error (residual energy / input energy): 0.0053
+
+band (Hz) | input share | residual share | band not reconstructed | output/input energy
+  0-1      |   0.0245    |    0.0434      |   0.009                |   0.981
+  1-4      |   0.1405    |    0.1620      |   0.006                |   0.978
+  4-8      |   0.1946    |    0.2220      |   0.006                |   0.990
+  8-12     |   0.4982    |    0.2518      |   0.003                |   0.991
+ 12-16     |   0.1350    |    0.1913      |   0.008                |   0.989
+ 16-20     |   0.0067    |    0.0679      |   0.053                |   0.969
+ 20-32     |   0.0005    |    0.0412      |   n/a (no input)       |   n/a
+ 32-64     |   0.0000    |    0.0104      |   n/a (no input)       |   n/a
+ 64-128    |   0.0000    |    0.0101      |   n/a (no input)       |   n/a
+
+Latent shape (456, 2) (912 values), zeros: 0.516, active channels: 1/2
+L1 penalty / MSE: 0.1866
