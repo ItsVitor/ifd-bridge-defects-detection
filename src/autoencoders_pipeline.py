@@ -161,6 +161,8 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.encoder_filters = cfg["encoder_filters"]
         self.pool_sizes = cfg["pool_sizes"]
         self.kernel_size = cfg["kernel_size"]
+        # Kernel só da primeira convolução do encoder; configs anteriores ao E013 não têm a chave.
+        self.first_kernel_size = cfg.get("first_kernel_size", self.kernel_size)
         self.l1_activity = cfg["l1_activity"]
         self.learning_rate = cfg["learning_rate"]
         self.epochs = cfg["epochs"]
@@ -279,6 +281,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
     def build_model(self, n_timesteps: int, n_channels: int) -> keras.Model:
         """Constrói o autoencoder Conv1D esparso (encoder e decoder espelhados).
 
+        A primeira convolução do encoder usa ``first_kernel_size``; todas as outras,
+        inclusive as do decoder, usam ``kernel_size``.
+
         Args:
             n_timesteps (int): Número de amostras temporais por sinal.
             n_channels (int): Número de canais (nós x eixos).
@@ -288,8 +293,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         """
         inputs = keras.Input(shape=(n_timesteps, n_channels))
         x = inputs
-        for filters, pool in zip(self.encoder_filters, self.pool_sizes):
-            x = keras.layers.Conv1D(filters, self.kernel_size, padding="same", activation="relu")(x)
+        for i, (filters, pool) in enumerate(zip(self.encoder_filters, self.pool_sizes)):
+            kernel = self.first_kernel_size if i == 0 else self.kernel_size
+            x = keras.layers.Conv1D(filters, kernel, padding="same", activation="relu")(x)
             x = keras.layers.MaxPooling1D(pool)(x)
         # Gargalo esparso: a penalidade L1 sobre as ativações força a maioria a zero.
         x = keras.layers.ActivityRegularization(l1=self.l1_activity, name="sparse_latent")(x)

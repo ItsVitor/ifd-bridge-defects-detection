@@ -236,7 +236,7 @@ if __name__ == "__main__":
     print(f"Device: {'GPU ' + str([g.name for g in gpus]) + ', op determinism on' if gpus else 'CPU only'}")
     print(
         f"\nHyperparameters: filters={pipeline.encoder_filters}, pools={pipeline.pool_sizes}, "
-        f"kernel={pipeline.kernel_size}, l1={pipeline.l1_activity}, lr={pipeline.learning_rate}, "
+        f"kernel={pipeline.kernel_size}, first_kernel={pipeline.first_kernel_size}, l1={pipeline.l1_activity}, lr={pipeline.learning_rate}, "
         f"threshold_rule={pipeline.threshold_rule}, threshold_k={pipeline.threshold_k}, "
         f"threshold_percentile={pipeline.threshold_percentile}"
     )
