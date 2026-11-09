@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Status | Proposto |
+| Status | Concluído (não adotado) |
 | Pai (base de comparação) | [E010](../E010_nyquist-latente-4-canais/README.md) (configuração); [E012](../E012_e010-na-gpu/README.md) (mesma configuração na GPU, referência numérica) |
 | Proposto em | 2026-11-09 |
-| Executado em | — |
-| Código | — (commitar antes do run) |
+| Executado em | 2026-11-09 |
+| Código | commit `0355d1e` |
 
 ## 1. Motivação
 
@@ -129,10 +129,93 @@ GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=true \
 
 O `run.log` deve mostrar `Device: GPU [...], op determinism on` e `first_kernel=65` na linha de hiperparâmetros. O teto é de 3000 épocas (15 folds × 200); o E012 somou 2119 em ~58 min. Este run deve levar um pouco mais (seção 3).
 
+**Execução real (2026-11-09), no notebook do autor (WSL2, GTX 1650):**
+- Código: commit `0355d1e` (registrado no `run.log`), sem aviso de alterações pendentes em `src/`.
+- `Device: GPU ['/physical_device:GPU:0'], op determinism on`; linha de hiperparâmetros com `kernel=19, first_kernel=65`. O modelo construído tem 87.240 parâmetros (conferido com `build_model` antes do run).
+- O encoder e o decoder ficaram com kernels diferentes (kernel 65 só na primeira convolução do encoder), como proposto na seção 3.
+- Run completo, sem erros; gráfico e diagnóstico do resíduo gerados normalmente.
+- Duração: de 16:36 a 17:32, **~56 min**. Treino: 0,83 h, 1,51 s/época em média (E012: 1,14 s, +32%).
+- Épocas por fold: 151, 132, 135, 167, 143, 110, 141, 113, 96, 108, 145, 180, 127, 100, 130 (1978 no total, contra 2119 no E012). O early stopping parou os 15 folds.
+
 ## 8. Resultados
+
+A referência numérica é o E012 (mesma configuração do E010, na GPU).
+
+### 8.1 Critérios só com saudáveis
+
+| Critério | E012 (GPU, referência) | Previsão | E013 | Resultado |
+|---|---|---|---|---|
+| Mediana, entre folds, do MSE médio dos saudáveis de treino (critério 1) | 0,00324 (0,0026–0,0042) | ≤ 0,00334 | 0,00354 (0,0027–0,0044), +9% | Refutada; critério 1 falha |
+| Razão p95 ÷ mediana do erro dos saudáveis (critério 2) | 1,568 (1,499–1,689) | Sem previsão; limite ≤ 1,589 | 1,599 (1,461–1,670) | Critério 2 falha (por 0,010) |
+| Parte não reconstruída de 16–20 Hz (mediana) | 3,1% (2,3–4,2%) | Sem previsão | 3,3% (2,7–4,0%) | — |
+| Energia criada fora da banda, relativa à entrada | 0,02% | Sem previsão | 0,02% | — |
+| Canais ativos no latente | 3 de 4 nos folds 1 e 4; 4 de 4 nos outros | Sem previsão | 3 de 4 nos folds 9, 10 e 11; 4 de 4 nos outros | — |
+| Zeros no latente (mediana) | 29,5% | — | 37,4% (32,8–45,8%) | — |
+| Penalidade L1 ÷ MSE (mediana) | 0,38 | — | 0,40 (0,37–0,45) | — |
+| Erro do peso 0,90 ÷ outros pesos (mediana entre folds) | 1,28 (1,23–1,43) | ≈ 1,3 | 1,27 (1,24–1,34) | Confirmada |
+| Folds parados pelo early stopping | 15 de 15 | Maioria | 15 de 15 | Confirmada |
+
+`val_loss`, mesmo coeficiente L1, comparável: mediana do melhor valor 0,0053 (0,0041–0,0068), contra 0,0050 no E012 (+6%).
+
+A diferença de MSE (+9%) é cerca de 3 vezes a variação de execução medida no E012 (2,8%). A diferença da razão (+0,031) é cerca de 1,5 vez a variação de execução da razão (0,021).
+
+Parte não reconstruída por faixa, mediana dos 15 folds:
+
+| Faixa (Hz) | 0–1 | 1–4 | 4–8 | 8–12 | 12–16 | 16–20 |
+|---|---|---|---|---|---|---|
+| E012 | 0,48% | 0,27% | 0,29% | 0,13% | 0,37% | 3,1% |
+| E013 | 0,48% | 0,30% | 0,30% | 0,16% | 0,39% | 3,3% |
+
+Erro relativo total: 0,26% → 0,29%.
+
+Composição acima do limiar no treino, por fold (grupo das 15 / peso 0,90 / outros): 14 / 40,3 / 8,7 (E012: 14 / 40,8 / 8,2).
+
+### 8.2 Métricas globais
+
+| Métrica | E012 (GPU) | E013 |
+|---|---|---|
+| Acurácia | 0,6256 ± 0,0219 | 0,6222 ± 0,0171 |
+| Recall | 0,3226 ± 0,1029 | 0,3188 ± 0,1094 |
+| FPR | 0,0815 (110) | 0,0844 (114) |
+| AUC agregada | 0,6657 | 0,6490 |
+| Matriz de confusão | TN 1240 · FP 110 · FN 884 · TP 421 | TN 1236 · FP 114 · FN 889 · TP 416 |
+
+### 8.3 Por severidade
+
+| Severidade | n | Recall E012 | Recall E013 | AUC E012 | AUC E013 | FN E012 | FN E013 | Erro mediano danificado ÷ saudável (E012 / E013) |
+|---|---|---|---|---|---|---|---|---|
+| 0,01 | 225 | 0,044 | 0,040 | 0,469 | 0,444 ± 0,046 | 215 | 216 | 0,99 / 0,98 |
+| 0,05 | 225 | 0,067 | 0,071 | 0,493 | 0,487 ± 0,045 | 210 | 209 | 0,99 / 0,99 |
+| 0,10 | 225 | 0,067 | 0,076 | 0,603 | 0,577 ± 0,060 | 210 | 208 | 1,07 / 1,04 |
+| 0,20 | 225 | 0,253 | 0,222 | 0,750 | 0,708 ± 0,068 | 168 | 175 | 1,24 / 1,16 |
+| 0,50 | 225 | 0,640 | 0,640 | 0,854 | 0,852 ± 0,051 | 81 | 81 | 3,87 / 2,75 |
+| 1,00 | 180 | 1,000 | 1,000 | 0,998 | 0,998 ± 0,004 | 0 | 0 | 27,0 / 23,2 |
+
+FPR por peso de vagão do fold: 0,90 (folds 10–12) 16%–43%; demais pesos 0%–13% (o máximo é o fold 7, peso 1,10 × módulo 0,975). Os folds 10–12 têm 82 dos 114 falsos positivos. O grupo irregularidade 2 × módulo 0,975 gerou os mesmos 15. FPR na irregularidade 1: 7,5% (E012: 7,2%).
+
+### 8.4 Distribuição dos erros
+
+![Distribuição do erro por severidade](error_distribution.png)
 
 ## 9. Análise
 
+**Hipótese (seção 2): refutada.** Com 37% mais parâmetros, o modelo reconstruiu um pouco pior os saudáveis (+9% de MSE, ~3 vezes a variação de execução) e a distribuição do erro dos saudáveis ficou um pouco mais larga (razão 1,568 → 1,599). A perda subiu levemente em todas as faixas, sem concentrar em nenhuma. A resolução de ~4 Hz da primeira camada não trouxe ganho de reconstrução que o MSE ou o espectro do resíduo mostrem.
+
+**Por que mais parâmetros não reduziram o erro.** Não foi verificado. Uma explicação possível: um filtro de 0,25 s responde ao conteúdo médio de um trecho longo e suaviza variações rápidas, e as camadas seguintes precisam recuperar esse detalhe; outra, mais simples, é que o otimizador encontra uma solução pior com o kernel maior nas mesmas 200 épocas. Não há medida neste run que separe as duas.
+
+**Os canais mortos mudaram de fold.** No E012, os folds 1 e 4 tinham um canal morto (nos dois runs com a configuração do E010); no E013, foram os folds 9, 10 e 11. A morte de canais depende da combinação de dados e arquitetura, e não só dos dados do fold.
+
+**Avaliação (seção 4.2): só reporte.** A separação entre danificados e saudáveis piorou: o erro mediano da severidade 0,5 caiu de 3,87× para 2,75× o dos saudáveis, e o da 0,2, de 1,24× para 1,16×. A AUC da severidade 0,2 caiu de 0,750 para 0,708 (−0,042, cerca de 3 vezes o ruído de execução de 0,013); a da 0,5 ficou igual. Os falsos negativos mudaram pouco (884 → 889), dentro do ruído.
+
+**Folds 10–12 (peso 0,90), diagnóstico de avaliação.** Como em todos os experimentos desde o E004, esses folds têm o maior recall (41–60%) e também o maior FPR (16–43%). O motivo não é detectar melhor: os saudáveis de teste do peso 0,90 têm erro ~1,36 vez maior que os saudáveis de treino do mesmo fold (nos outros pesos, ~1,04), então o limiar fica perto da mediana dos saudáveis de teste (1,11–1,32×, contra 1,20–1,79× nos outros folds) e mais passagens de qualquer tipo passam dele. A AUC desses folds é a mais baixa (0,61–0,67), e o recall menos o FPR fica abaixo dos outros (0,16–0,26, contra 0,21–0,29).
+
 ## 10. Decisão e próximos passos
+
+- **Critério da seção 4.3: não atendido.** O critério 1 falhou (MSE 0,00354 > 0,00334) e o critério 2 também (razão 1,599 > 1,589).
+- **Decisão: não adotada.** A base continua sendo a configuração do E010, com o E012 como referência numérica na GPU.
+- **Kernel 65 também na convolução de saída** (variante simétrica, discutida antes do run): sem motivação, já que a versão só no encoder não melhorou a reconstrução.
+- **Variantes avaliadas nos folds de teste até aqui:** 13 (E001–E013).
+
+Com E011 e E013, as duas mudanças de arquitetura restantes que tinham motivação própria pioraram a reconstrução dos saudáveis. O eixo de compressão e arquitetura está esgotado para os critérios só com saudáveis disponíveis. Os caminhos que atacam a causa principal dos falsos negativos (variação das condições operacionais no erro, dano pequeno) são os reservados pelo autor: limiar ou normalização por condição operacional, e entrada espectral (PSD).
 
 ## Notas posteriores
