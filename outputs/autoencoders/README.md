@@ -3,7 +3,8 @@
 Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_template.md`.
 
 - **Base atual:** E010 (pools `[2, 2, 1]`, filtros `[32, 32, 4]`, kernel 19, latente 456 × 4, `l1_activity = 1e-5`, limiar no percentil 95, 200 épocas com early stopping).
-- **Variantes avaliadas nos folds de teste até aqui:** 10 (E001–E010).
+- **Referência numérica na GPU:** E012 (configuração do E010; margem de variação de execução de 3% na mediana do MSE dos saudáveis).
+- **Variantes avaliadas nos folds de teste até aqui:** 11 (E001–E010 e E012).
 
 | ID | Título | Pai | Mudança | Hipótese (resumo) | Resultado principal | Decisão | Status |
 |---|---|---|---|---|---|---|---|
@@ -18,4 +19,4 @@ Fluxo e regras: `docs/experiments.md`. Modelo de registro: `docs/experiment_temp
 | [E009](E009_nyquist-latente-32hz/README.md) | nyquist-latente-32hz | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), filtros da última camada do encoder 4 → 2 (latente mantido em 912) | Com o latente a 64 amostras/s (Nyquist 32 Hz), 16–20 Hz e a energia criada acima de 20 Hz diminuem | MSE saudáveis 0,0067 → 0,0076; 1 de 2 canais ativos; 16–20 Hz 7,6% → 5,3% só no fold 1 (atípico); FN 884 → 906; FPR 9,0% | Não adotada (MSE saudáveis, canal morto) | Concluído |
 | [E010](E010_nyquist-latente-4-canais/README.md) | nyquist-latente-4-canais | E008 | `pool_sizes` [2,2,2] → [2,2,1] (redução no tempo 8× → 4×), mantendo 4 canais (latente 912 → 1824) | Com o latente a 64 amostras/s sem o gargalo de 2 canais do E009, o erro dos saudáveis e a perda em 16–20 Hz caem | MSE saudáveis 0,0067 → 0,0033; 16–20 Hz 3,1% (mediana dos folds); canal morto em 2 de 15 folds; FN 884 → 891; FPR 10,2% → 6,7%; AUC sev. 0,2: 0,71 → 0,75 | Adotada (MSE saudáveis, canais ativos) | Concluído |
 | [E011](E011_filtros-graduais/README.md) | filtros-graduais | E010 | `encoder_filters` [32,32,4] → [32,16,4] (compressão de 4× em cada um dos blocos 2 e 3; latente mantido em 456 × 4) | Com a compressão dividida entre os blocos, o erro dos saudáveis não aumenta e nenhum canal morre, com 34% menos parâmetros (roda na GPU; referência: E012) | — | — | Proposto |
-| [E012](E012_e010-na-gpu/README.md) | e010-na-gpu | E010 | Mesma configuração do E010, rodada na GPU (WSL2, determinismo ligado) | Trocar CPU por GPU muda a mediana do MSE dos saudáveis em até 10%; mede a variação de execução e serve de referência para os runs na GPU | — | — | Proposto |
+| [E012](E012_e010-na-gpu/README.md) | e010-na-gpu | E010 | Mesma configuração do E010, rodada na GPU (WSL2, determinismo ligado) | Trocar CPU por GPU muda a mediana do MSE dos saudáveis em até 10%; mede a variação de execução e serve de referência para os runs na GPU | Mediana do MSE 0,00334 → 0,00324 (−2,8%), mas folds individuais de −34% a +42%; mesmos canais mortos (folds 1 e 4); FN 891 → 884; FPR 6,7% → 8,2%; 52 de 2655 decisões mudaram; ~58 min (~4,6× mais rápido) | Referência na GPU (margem 3% na mediana do MSE); comparações fold a fold deixam de valer | Concluído |
