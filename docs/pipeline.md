@@ -43,6 +43,7 @@ Even for the pipelines that does not have a feature extraction step, like autoen
     - **Metadata Columns:** `Group_ID` and `Class`, same as above.
 2. **Signal Length:** Records have 1827, 2010 or 2233 samples depending on train speed. All signals are cropped to the shortest length, rounded down to a multiple of the total pooling factor (1827 → 1824 samples, ≈ 7.1 s). Signals are **not** resampled, since that would shift the modal frequencies the model is meant to learn.
 3. **Reshape:** The `normalize` step reshapes each row back to `(timesteps, channels)` before training.
+4. **Optional spectral input** (`input_domain: "psd"`, from E014): after filtering and cropping, each channel becomes the log10 of its Welch PSD (`psd_nperseg`, `psd_band`), so rows are flattened from `(frequencies, channels)` with columns `{axis}_N{node_id}_f{Hz}`. The pooling then reduces the frequency axis, and the number of frequencies must be a multiple of the total pooling factor. The default `input_domain: "time"` keeps the raw-signal input.
 
 
 

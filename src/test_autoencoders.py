@@ -9,28 +9,29 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.metrics import roc_auc_score
 
-from autoencoders_pipeline import RESIDUAL_BANDS, AutoencoderPipeline
+from autoencoders_pipeline import AutoencoderPipeline
 
 EOV_FACTORS = ["Velocidade", "Peso_Vagao", "Modulo_Elasticidade", "Irregularidade"]
+LATENT_COLUMNS = ["latent_zeros", "active_channels", "latent_channels", "l1_over_mse"]
 
 
 def residual_table(stats: pd.DataFrame) -> pd.DataFrame:
-    """Resume o espectro do resíduo dos saudáveis de treino por fold, com mediana, mínimo e máximo.
+    """Resume o diagnóstico do resíduo dos saudáveis de treino por fold, com mediana, mínimo e máximo.
 
     Args:
-        stats (pd.DataFrame): Uma linha por fold com as chaves de ``residual_spectrum``.
+        stats (pd.DataFrame): Uma linha por fold com as chaves de ``residual_spectrum``
+            (entrada no tempo) ou de ``residual_by_frequency`` (entrada log-PSD).
 
     Returns:
-        pd.DataFrame: Erro relativo, parte não reconstruída de cada faixa com entrada,
-            energia criada fora da banda (÷ energia de entrada) e medidas do latente, por
-            fold, seguidas das linhas 'median', 'min' e 'max'.
+        pd.DataFrame: Por fold, seguidas das linhas 'median', 'min' e 'max': no tempo, erro
+            relativo, parte não reconstruída de cada faixa com entrada e energia criada fora
+            da banda; com PSD, o MSE de cada faixa; nos dois casos, as medidas do latente.
     """
-    in_band = [f"{lo}-{hi}" for lo, hi in RESIDUAL_BANDS if stats[f"not_rec_{lo}-{hi}"].notna().all()]
-    view = pd.concat([
-        stats[["rel_error"]],
-        stats[[f"not_rec_{b}" for b in in_band]],
-        stats[["created_out_of_band", "latent_zeros", "active_channels", "latent_channels", "l1_over_mse"]],
-    ], axis=1)
+    band_columns = [c for c in stats if (c.startswith("not_rec_") and stats[c].notna().all())
+                    or c.startswith("mse_")]
+    columns = ([c for c in ["rel_error"] if c in stats] + band_columns
+               + [c for c in ["created_out_of_band"] + LATENT_COLUMNS if c in stats])
+    view = stats[columns]
     return pd.concat([view, view.agg(["median", "min", "max"])])
 
 
@@ -234,6 +235,8 @@ if __name__ == "__main__":
     print(f"Code revision: {git_revision()}")
     gpus = tf.config.list_physical_devices("GPU")
     print(f"Device: {'GPU ' + str([g.name for g in gpus]) + ', op determinism on' if gpus else 'CPU only'}")
+    psd = f" (nperseg={pipeline.psd_nperseg}, band={pipeline.psd_band})" if pipeline.input_domain == "psd" else ""
+    print(f"Input domain: {pipeline.input_domain}{psd}")
     print(
         f"\nHyperparameters: filters={pipeline.encoder_filters}, pools={pipeline.pool_sizes}, "
         f"kernel={pipeline.kernel_size}, first_kernel={pipeline.first_kernel_size}, l1={pipeline.l1_activity}, lr={pipeline.learning_rate}, "
@@ -298,7 +301,8 @@ if __name__ == "__main__":
     report = (
         "Residual spectrum, healthy TRAIN samples of each fold\n"
         "not_rec_<band>: band energy not reconstructed | created_out_of_band: residual in bands "
-        "without input / input energy\n\n" + residual_table(stats).round(4).to_string()
+        "without input / input energy | mse_<band> (PSD input): mean squared error of the "
+        "standardized log-PSD in the band\n\n" + residual_table(stats).round(4).to_string()
     )
     print("\n" + "=" * 60 + "\nDIAGNOSTICS: RESIDUAL SPECTRUM\n" + "=" * 60 + "\n" + report)
     with open(os.path.join(experiment_dir, "residual_spectrum.txt"), "w", encoding="utf-8") as f:

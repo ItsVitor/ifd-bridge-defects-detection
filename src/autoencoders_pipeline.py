@@ -55,12 +55,82 @@ def residual_spectrum(
         if not has_input:
             stats["created_out_of_band"] += float(band_res / total_in)
 
-    mse = float(np.mean(residual ** 2))
-    stats["latent_zeros"] = float(np.mean(latent == 0))
-    stats["active_channels"] = int((np.mean(latent > 0, axis=(0, 1)) > 0.01).sum())
-    stats["latent_channels"] = int(latent.shape[2])
-    stats["l1_over_mse"] = float(l1_activity * np.abs(latent).sum(axis=(1, 2)).mean() / mse)
+    stats.update(latent_stats(latent, float(np.mean(residual ** 2)), l1_activity))
     return stats
+
+
+def residual_by_frequency(
+    X: np.ndarray, X_hat: np.ndarray, latent: np.ndarray, freqs: np.ndarray, l1_activity: float
+) -> dict[str, float]:
+    """Diagnóstico para entrada log-PSD: erro quadrático médio por faixa de frequência.
+
+    Com a entrada já no domínio da frequência, cada posição do resíduo pertence a uma
+    frequência, então não há Welch sobre o resíduo. O erro está em unidades do log-PSD
+    padronizado, não comparáveis com as de ``residual_spectrum``. Diagnóstico só com
+    saudáveis: não ajusta nada no modelo nem no limiar.
+
+    Args:
+        X (np.ndarray): Log-PSD padronizado de entrada (amostras, frequências, canais).
+        X_hat (np.ndarray): Reconstrução de ``X``, mesmo formato.
+        latent (np.ndarray): Ativações do latente para ``X`` (amostras, posições, canais).
+        freqs (np.ndarray): Frequência, em Hz, de cada posição do eixo 1 de ``X``.
+        l1_activity (float): Coeficiente L1 de atividade usado no treino.
+
+    Returns:
+        dict[str, float]: 'mse_{lo}-{hi}' para cada faixa de ``RESIDUAL_BANDS`` com pelo
+            menos uma frequência, mais as medidas de ``latent_stats``.
+    """
+    squared = (X - X_hat) ** 2
+    stats = {}
+    for lo, hi in RESIDUAL_BANDS:
+        m = (freqs > lo) & (freqs <= hi) if lo else (freqs <= hi)
+        if m.any():
+            stats[f"mse_{lo}-{hi}"] = float(squared[:, m, :].mean())
+    stats.update(latent_stats(latent, float(squared.mean()), l1_activity))
+    return stats
+
+
+def latent_stats(latent: np.ndarray, mse: float, l1_activity: float) -> dict[str, float]:
+    """Mede a esparsidade do latente e o peso da penalidade L1 em relação ao MSE.
+
+    Args:
+        latent (np.ndarray): Ativações do latente (amostras, posições, canais).
+        mse (float): Erro quadrático médio de reconstrução das mesmas amostras.
+        l1_activity (float): Coeficiente L1 de atividade usado no treino.
+
+    Returns:
+        dict[str, float]: 'latent_zeros' (fração de ativações nulas), 'active_channels'
+            (canais não nulos em mais de 1% das ativações), 'latent_channels' e
+            'l1_over_mse' (penalidade L1 média por amostra ÷ MSE).
+    """
+    return {
+        "latent_zeros": float(np.mean(latent == 0)),
+        "active_channels": int((np.mean(latent > 0, axis=(0, 1)) > 0.01).sum()),
+        "latent_channels": int(latent.shape[2]),
+        "l1_over_mse": float(l1_activity * np.abs(latent).sum(axis=(1, 2)).mean() / mse),
+    }
+
+
+def log_psd(
+    signal: np.ndarray, fs: float, nperseg: int, band: tuple[float, float]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Calcula o log10 da PSD (Welch, janela de Hann, 50% de sobreposição) de cada canal.
+
+    É uma transformação fixa, sem nada ajustado aos dados.
+
+    Args:
+        signal (np.ndarray): Sinal no tempo (amostras, canais).
+        fs (float): Frequência de amostragem em Hz.
+        nperseg (int): Tamanho do segmento do Welch; a resolução é ``fs / nperseg``.
+        band (tuple[float, float]): Frequências mínima e máxima mantidas, em Hz, inclusive.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Frequências mantidas (frequências,) e log10 da PSD
+            (frequências, canais).
+    """
+    freqs, psd = welch(signal, fs=fs, nperseg=nperseg, axis=0)
+    keep = (freqs >= band[0]) & (freqs <= band[1])
+    return freqs[keep], np.log10(psd[keep])
 
 
 def compute_threshold(errors: np.ndarray, rule: str, k: float, percentile: float | None) -> float:
@@ -163,6 +233,14 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.kernel_size = cfg["kernel_size"]
         # Kernel só da primeira convolução do encoder; configs anteriores ao E013 não têm a chave.
         self.first_kernel_size = cfg.get("first_kernel_size", self.kernel_size)
+        # Entrada: "time" (sinal filtrado) ou "psd" (log10 da PSD de cada canal, eixo de
+        # frequência no lugar do tempo). Configs anteriores ao E014 não têm a chave.
+        self.input_domain = cfg.get("input_domain", "time")
+        if self.input_domain not in ("time", "psd"):
+            raise ValueError(f"input_domain must be 'time' or 'psd', got {self.input_domain!r}")
+        self.psd_nperseg = cfg["psd_nperseg"] if self.input_domain == "psd" else None
+        self.psd_band = tuple(cfg["psd_band"]) if self.input_domain == "psd" else None
+        self.psd_freqs: np.ndarray | None = None
         self.l1_activity = cfg["l1_activity"]
         self.learning_rate = cfg["learning_rate"]
         self.epochs = cfg["epochs"]
@@ -183,16 +261,22 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.residual_stats: list[dict[str, float]] = []
 
     def extract_features(self, raw_data: pd.DataFrame) -> pd.DataFrame: #TODO: adicionar typing @override
-        """Monta a matriz de sinais brutos, uma linha por experimento.
+        """Monta a matriz de entrada, uma linha por experimento.
 
-        Cada linha contém o sinal (tempo x canais) achatado; ``normalize`` o
-        remodela para (amostras, tempo, canais) antes do treino.
+        Cada linha contém o sinal filtrado (tempo x canais) achatado ou, com
+        ``input_domain: "psd"``, o log10 da PSD de cada canal (frequências x canais);
+        ``normalize`` remodela a linha para (amostras, posições, canais) antes do treino.
 
         Args:
             raw_data (pd.DataFrame): Dados brutos de aceleração vindos de ``load_data``.
 
         Returns:
-            pd.DataFrame: Matriz com colunas ``{eixo}_N{nó}_t{i}`` mais 'Class' e 'Group_ID'.
+            pd.DataFrame: Matriz com colunas ``{eixo}_N{nó}_t{i}`` (tempo) ou
+                ``{eixo}_N{nó}_f{Hz}`` (PSD), mais 'Class' e 'Group_ID'.
+
+        Raises:
+            ValueError: Se a matriz tiver valores não finitos ou se o número de frequências
+                não for múltiplo da redução total dos pools.
         """
         node_ids = sorted(raw_data["NodeID"].unique())
         if self.nodes_to_use is not None:
@@ -224,7 +308,10 @@ class AutoencoderPipeline(BridgeDefectPipeline):
                 for _, node_data in exp_group.groupby("NodeID")
                 for col in axes_cols
             ]
-            signals.append(np.stack(channels, axis=-1).astype(np.float32).ravel())
+            signal = np.stack(channels, axis=-1)
+            if self.input_domain == "psd":
+                self.psd_freqs, signal = log_psd(signal, self.fs, self.psd_nperseg, self.psd_band)
+            signals.append(signal.astype(np.float32).ravel())
             classes.append(exp_group["Class"].iloc[0])
             group_ids.append(self._compute_group_id(exp_group))
             metadata.append(exp_group[meta_cols].iloc[[0]])
@@ -233,8 +320,22 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.sample_metadata = pd.concat(metadata, ignore_index=True)
         self.sample_metadata["Group_ID"] = group_ids
 
-        columns = [f"{c.split('_')[1]}_N{n}_t{t}" for t in range(length) for n in node_ids for c in axes_cols]
-        feature_df = pd.DataFrame(np.vstack(signals), columns=columns)
+        if self.input_domain == "psd":
+            # O recorte acima continua em múltiplo dos pools só para manter o mesmo trecho
+            # de sinal dos experimentos no tempo; com PSD, os pools reduzem o eixo da frequência.
+            print(f"Input: log10 PSD (Welch, nperseg={self.psd_nperseg}, "
+                  f"{self.psd_freqs[0]:g}-{self.psd_freqs[-1]:g} Hz, {len(self.psd_freqs)} frequencies)")
+            if len(self.psd_freqs) % down_factor:
+                raise ValueError(f"{len(self.psd_freqs)} frequencies is not a multiple of the "
+                                 f"pooling reduction {down_factor}; adjust psd_band")
+            positions = [f"f{f:g}" for f in self.psd_freqs]
+        else:
+            positions = [f"t{t}" for t in range(length)]
+        matrix = np.vstack(signals)
+        if not np.isfinite(matrix).all():
+            raise ValueError("Input matrix has non-finite values (e.g. log10 of a zero PSD)")
+        columns = [f"{c.split('_')[1]}_N{n}_{pos}" for pos in positions for n in node_ids for c in axes_cols]
+        feature_df = pd.DataFrame(matrix, columns=columns)
         feature_df["Class"] = classes
         feature_df["Group_ID"] = group_ids
         return feature_df
@@ -242,9 +343,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
     def select_features( #TODO: adicionar typing @override
         self, X_train: np.ndarray, X_test: np.ndarray, fold_idx: int
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Não aplica filtros de variância/correlação: as colunas são instantes de tempo.
+        """Não aplica filtros de variância/correlação: as colunas são instantes de tempo ou frequências.
 
-        Remover colunas quebraria a continuidade temporal que a convolução explora.
+        Remover colunas quebraria a continuidade (no tempo ou na frequência) que a convolução explora.
 
         Args:
             X_train (np.ndarray): Sinais de treino achatados.
@@ -261,9 +362,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
     ) -> tuple[np.ndarray, np.ndarray]:
         """Padroniza cada canal (média 0, desvio 1) com estatísticas apenas do treino.
 
-        A padronização é por canal, e não por instante de tempo, para preservar a
-        forma de onda; as acelerações brutas são pequenas (RMS ~5e-2), o que
-        dificultaria a otimização da rede.
+        A padronização é por canal, e não por instante de tempo (ou por frequência), para
+        preservar a forma de onda (ou a forma do espectro); as acelerações brutas são
+        pequenas (RMS ~5e-2), o que dificultaria a otimização da rede.
 
         Args:
             X_train (np.ndarray): Sinais de treino achatados (amostras, tempo*canais).
@@ -285,7 +386,7 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         inclusive as do decoder, usam ``kernel_size``.
 
         Args:
-            n_timesteps (int): Número de amostras temporais por sinal.
+            n_timesteps (int): Número de amostras temporais por sinal (de frequências, com entrada log-PSD).
             n_channels (int): Número de canais (nós x eixos).
 
         Returns:
@@ -357,5 +458,9 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         print(f"Train error: mean={errors.mean():.4f}, std={errors.std():.4f} -> threshold={threshold:.4f}")
 
         latent = keras.Model(model.input, model.get_layer("sparse_latent").output).predict(X_healthy, verbose=0)
-        self.residual_stats.append(residual_spectrum(X_healthy, X_hat, latent, self.fs, self.l1_activity))
+        if self.input_domain == "psd":
+            stats = residual_by_frequency(X_healthy, X_hat, latent, self.psd_freqs, self.l1_activity)
+        else:
+            stats = residual_spectrum(X_healthy, X_hat, latent, self.fs, self.l1_activity)
+        self.residual_stats.append(stats)
         return ThresholdedAutoencoder(model, threshold=threshold, error_log=self.test_errors)
