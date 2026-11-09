@@ -1,0 +1,45 @@
+Exploração só com saudáveis (v2_healthy + v2_slightly_damaged, 1350 passagens), 2026-11-09.
+Mesmo pré-processamento do E012: 8 nós x X/Y = 16 canais, passa-banda 1-20 Hz (filtfilt) no registro
+completo, recorte em 1824 amostras. PSD de Welch (Hann, 50% de sobreposição) por canal, log10.
+"Combinação" = velocidade x peso x módulo x irregularidade. Nenhum dado danificado foi usado.
+Script único, não versionado (cálculos descritos no README do E014, seção 1).
+
+X (1350, 1824, 16) | passages 1350 | irreg 1: 1305
+
+TIME domain, irreg 1: eta2(combo) of raw samples, median over 29184 features: 0.124
+TIME log-RMS per channel, eta2 median over channels: {'vel': 0.752, 'w': 0.046, 'mod': 0.006, 'irr': 0.002}
+
+nperseg | bins in 1-20.5 Hz | resolution | eta2(combo) median | within-combo std (dB) median
+    256 |                20 | 1.00 Hz    | 0.990              | 0.136
+    512 |                40 | 0.50 Hz    | 0.993              | 0.159
+   1024 |                79 | 0.25 Hz    | 0.993              | 0.244
+
+nperseg 512: freqs 1.0 ... 20.5 n = 40
+Peaks of mean log-PSD (Hz, dB rel. max): [(10.5, 0.0), (4.0, -4.3), (12.5, -6.3), (6.0, -6.9), (9.0, -7.6), (14.0, -9.6)]
+  peak 10.5 Hz: bins within 3 dB of the peak (+-6 bins): 3
+  peak 4.0 Hz: bins within 3 dB of the peak (+-6 bins): 5
+  peak 12.5 Hz: bins within 3 dB of the peak (+-6 bins): 8
+  peak 6.0 Hz: bins within 3 dB of the peak (+-6 bins): 9
+  speed 45: top peaks (Hz) [10.5, 12.5, 3.5, 6.5, 7.5]
+  speed 50: top peaks (Hz) [10.5, 3.5, 6.0, 14.0, 12.5]
+  speed 55: top peaks (Hz) [10.5, 6.5, 4.0, 11.5, 9.0]
+
+eta2 per factor, median over channels and bins in each band (all 1350 healthy):
+   band   vel     w   mod   irr
+    1-4 0.824 0.059 0.012 0.001
+    4-8 0.918 0.024 0.007 0.002
+   8-12 0.754 0.013 0.001 0.003
+  12-16 0.961 0.001 0.001 0.001
+16-20.5 0.922 0.004 0.004 0.001
+    all 0.907 0.008 0.003 0.001
+eta2(combo) irreg 1, per band: {'1-4': 0.993, '4-8': 0.997, '8-12': 0.987, '12-16': 0.993, '16-20.5': 0.984}
+
+Weight: RMS distance of group-mean log-PSD to weight 1.00 (dB): {90: 1.689, 95: 0.819, 100: 0.0, 105: 0.476, 110: 1.03}
+Modulus: peak frequency by parabolic interpolation (mean spectrum per modulus):
+  near 10.5 Hz: {975: 10.49, 1000: 10.487, 1025: 10.492}
+  near 4.0 Hz: {975: 3.981, 1000: 4.046, 1025: 4.106}
+  near 12.5 Hz: {975: 12.426, 1000: 12.423, 1025: 12.426}
+  mean log-PSD mod 0.975 - mod 1.025 (dB): max |diff| 0.89 at 3.0 Hz
+
+Irreg 2 vs mean irreg-1 passage of the same combo, RMS dB by modulus: {975: 4.45, 1000: 0.32, 1025: 0.47}
+Reference: irreg-1 passage vs its combo mean, RMS dB median: 0.36

@@ -1,0 +1,15 @@
+2026-11-09 19:50:56.294263: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+============================================================
+SPARSE CONV1D AUTOENCODER PIPELINE TEST
+============================================================
+
+Experiment: outputs/autoencoders/E014_entrada-log-psd
+Code revision: f4217f6 (WARNING: uncommitted changes in src/)
+Device: GPU ['/physical_device:GPU:0'], op determinism on
+Input domain: psd (nperseg=512, band=(1.0, 20.5))
+
+Hyperparameters: filters=[32, 32, 4], pools=[2, 2, 1], kernel=5, first_kernel=5, l1=1e-05, lr=0.001, threshold_rule=percentile, threshold_k=1.0, threshold_percentile=95
+
+Running full pipeline...
+Loading data files:   0%|          | 0/7 [00:00<?, ?it/s]Loading data files:  14%|█▍        | 1/7 [00:00<00:05,  1.18it/s]Loading data files:  29%|██▊       | 2/7 [00:14<00:41,  8.33s/it]Loading data files:  43%|████▎     | 3/7 [00:16<00:21,  5.27s/it]Loading data files:  57%|█████▋    | 4/7 [00:17<00:11,  3.92s/it]Loading data files:  71%|███████▏  | 5/7 [00:19<00:06,  3.15s/it]Loading data files:  86%|████████▌ | 6/7 [00:21<00:02,  2.69s/it]Loading data files: 100%|██████████| 7/7 [00:22<00:00,  2.29s/it]Loading data files: 100%|██████████| 7/7 [00:22<00:00,  3.28s/it]
