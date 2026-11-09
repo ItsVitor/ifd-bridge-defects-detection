@@ -8,9 +8,29 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-from autoencoders_pipeline import AutoencoderPipeline
+from autoencoders_pipeline import RESIDUAL_BANDS, AutoencoderPipeline
 
 EOV_FACTORS = ["Velocidade", "Peso_Vagao", "Modulo_Elasticidade", "Irregularidade"]
+
+
+def residual_table(stats: pd.DataFrame) -> pd.DataFrame:
+    """Resume o espectro do resíduo dos saudáveis de treino por fold, com mediana, mínimo e máximo.
+
+    Args:
+        stats (pd.DataFrame): Uma linha por fold com as chaves de ``residual_spectrum``.
+
+    Returns:
+        pd.DataFrame: Erro relativo, parte não reconstruída de cada faixa com entrada,
+            energia criada fora da banda (÷ energia de entrada) e medidas do latente, por
+            fold, seguidas das linhas 'median', 'min' e 'max'.
+    """
+    in_band = [f"{lo}-{hi}" for lo, hi in RESIDUAL_BANDS if stats[f"not_rec_{lo}-{hi}"].notna().all()]
+    view = pd.concat([
+        stats[["rel_error"]],
+        stats[[f"not_rec_{b}" for b in in_band]],
+        stats[["created_out_of_band", "latent_zeros", "active_channels", "latent_channels", "l1_over_mse"]],
+    ], axis=1)
+    return pd.concat([view, view.agg(["median", "min", "max"])])
 
 
 def git_revision() -> str:
@@ -268,3 +288,15 @@ if __name__ == "__main__":
     assert np.array_equal(preds["y_pred"], (test_df["error"] > test_df["threshold"]).astype(int))
 
     print_error_report(test_df, train_df, experiment_dir)
+
+    # --- Diagnóstico só com saudáveis de treino: espectro do resíduo e latente, por fold ---
+    stats = pd.DataFrame(pipeline.residual_stats, index=pd.RangeIndex(1, len(splits) + 1, name="fold"))
+    stats.to_parquet(os.path.join(experiment_dir, "residual_spectrum.parquet"))
+    report = (
+        "Residual spectrum, healthy TRAIN samples of each fold\n"
+        "not_rec_<band>: band energy not reconstructed | created_out_of_band: residual in bands "
+        "without input / input energy\n\n" + residual_table(stats).round(4).to_string()
+    )
+    print("\n" + "=" * 60 + "\nDIAGNOSTICS: RESIDUAL SPECTRUM\n" + "=" * 60 + "\n" + report)
+    with open(os.path.join(experiment_dir, "residual_spectrum.txt"), "w", encoding="utf-8") as f:
+        f.write(report + "\n")

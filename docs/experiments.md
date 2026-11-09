@@ -13,6 +13,8 @@ outputs/autoencoders/
     ├── run.log                  # saída completa do run
     ├── test_errors.parquet      # erro por amostra de teste, com metadados EOV
     ├── train_errors.parquet     # erro por amostra saudável de treino, por fold
+    ├── residual_spectrum.txt    # espectro do resíduo e latente dos saudáveis de treino, por fold (resumo)
+    ├── residual_spectrum.parquet # idem, todas as medidas por faixa
     └── error_distribution.png   # distribuição do erro por severidade
 ```
 

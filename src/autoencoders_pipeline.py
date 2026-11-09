@@ -2,10 +2,64 @@
 
 import numpy as np
 import pandas as pd
+from scipy.signal import welch
 from tensorflow import keras
 from tqdm import tqdm
 
 from pipeline_template import BridgeDefectPipeline
+
+RESIDUAL_BANDS = [(0, 1), (1, 4), (4, 8), (8, 12), (12, 16), (16, 20), (20, 32), (32, 64), (64, 128)]
+
+
+def residual_spectrum(
+    X: np.ndarray, X_hat: np.ndarray, latent: np.ndarray, fs: float, l1_activity: float
+) -> dict[str, float]:
+    """Descreve, por faixa de frequência, o resíduo de reconstrução e o espaço latente.
+
+    Diagnóstico só com saudáveis: não ajusta nada no modelo nem no limiar. Uma faixa é
+    considerada sem entrada quando tem menos de 0,1% da energia de entrada; nela, o
+    resíduo é energia criada pelo próprio modelo.
+
+    Args:
+        X (np.ndarray): Sinais de entrada (amostras, tempo, canais).
+        X_hat (np.ndarray): Reconstrução de ``X``, mesmo formato.
+        latent (np.ndarray): Ativações do latente para ``X`` (amostras, tempo, canais).
+        fs (float): Frequência de amostragem em Hz.
+        l1_activity (float): Coeficiente L1 de atividade usado no treino.
+
+    Returns:
+        dict[str, float]: 'rel_error' (energia do resíduo ÷ energia de entrada),
+            'created_out_of_band' (resíduo nas faixas sem entrada ÷ energia de entrada),
+            por faixa 'in_share_{lo}-{hi}', 'res_share_{lo}-{hi}', 'not_rec_{lo}-{hi}' e
+            'out_in_{lo}-{hi}' (NaN nas faixas sem entrada), e do latente 'latent_zeros',
+            'active_channels', 'latent_channels' e 'l1_over_mse'.
+    """
+    residual = X - X_hat
+    f, p_in = welch(X, fs=fs, nperseg=512, axis=1)
+    _, p_res = welch(residual, fs=fs, nperseg=512, axis=1)
+    _, p_out = welch(X_hat, fs=fs, nperseg=512, axis=1)
+    p_in, p_res, p_out = (p.mean(axis=(0, 2)) for p in (p_in, p_res, p_out))
+    total_in, total_res = p_in.sum(), p_res.sum()
+
+    stats = {"rel_error": float(total_res / total_in), "created_out_of_band": 0.0}
+    for lo, hi in RESIDUAL_BANDS:
+        m = (f > lo) & (f <= hi) if lo else (f <= hi)
+        band_in, band_res = p_in[m].sum(), p_res[m].sum()
+        has_input = band_in / total_in > 1e-3
+        stats[f"in_share_{lo}-{hi}"] = float(band_in / total_in)
+        stats[f"res_share_{lo}-{hi}"] = float(band_res / total_res)
+        # Sem entrada, as razões explodem e não têm significado.
+        stats[f"not_rec_{lo}-{hi}"] = float(band_res / band_in) if has_input else np.nan
+        stats[f"out_in_{lo}-{hi}"] = float(p_out[m].sum() / band_in) if has_input else np.nan
+        if not has_input:
+            stats["created_out_of_band"] += float(band_res / total_in)
+
+    mse = float(np.mean(residual ** 2))
+    stats["latent_zeros"] = float(np.mean(latent == 0))
+    stats["active_channels"] = int((np.mean(latent > 0, axis=(0, 1)) > 0.01).sum())
+    stats["latent_channels"] = int(latent.shape[2])
+    stats["l1_over_mse"] = float(l1_activity * np.abs(latent).sum(axis=(1, 2)).mean() / mse)
+    return stats
 
 
 def compute_threshold(errors: np.ndarray, rule: str, k: float, percentile: float | None) -> float:
@@ -123,6 +177,7 @@ class AutoencoderPipeline(BridgeDefectPipeline):
         self.train_errors: list[np.ndarray] = []
         self.test_errors: list[np.ndarray] = []
         self.thresholds: list[float] = []
+        self.residual_stats: list[dict[str, float]] = []
 
     def extract_features(self, raw_data: pd.DataFrame) -> pd.DataFrame: #TODO: adicionar typing @override
         """Monta a matriz de sinais brutos, uma linha por experimento.
@@ -281,13 +336,15 @@ class AutoencoderPipeline(BridgeDefectPipeline):
             verbose=2,
         )
 
-        detector = ThresholdedAutoencoder(model, threshold=0.0, error_log=self.test_errors)
         # Erros na ordem original (não embaralhada), para casar com os metadados.
-        errors = detector.reconstruction_error(X_healthy)
-        detector.threshold = compute_threshold(
-            errors, self.threshold_rule, self.threshold_k, self.threshold_percentile
-        )
+        # Mesmo cálculo de ThresholdedAutoencoder.reconstruction_error, reaproveitando X_hat.
+        X_hat = model.predict(X_healthy, verbose=0)
+        errors = np.mean((X_healthy - X_hat) ** 2, axis=(1, 2))
+        threshold = compute_threshold(errors, self.threshold_rule, self.threshold_k, self.threshold_percentile)
         self.train_errors.append(errors)
-        self.thresholds.append(detector.threshold)
-        print(f"Train error: mean={errors.mean():.4f}, std={errors.std():.4f} -> threshold={detector.threshold:.4f}")
-        return detector
+        self.thresholds.append(threshold)
+        print(f"Train error: mean={errors.mean():.4f}, std={errors.std():.4f} -> threshold={threshold:.4f}")
+
+        latent = keras.Model(model.input, model.get_layer("sparse_latent").output).predict(X_healthy, verbose=0)
+        self.residual_stats.append(residual_spectrum(X_healthy, X_hat, latent, self.fs, self.l1_activity))
+        return ThresholdedAutoencoder(model, threshold=threshold, error_log=self.test_errors)
