@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Status | Proposto |
+| Status | Concluído (não adotado) |
 | Pai (base de comparação) | [E010](../E010_nyquist-latente-4-canais/README.md) (configuração); [E012](../E012_e010-na-gpu/README.md) (mesma configuração na GPU, referência numérica) |
 | Proposto em | 2026-11-09 |
-| Executado em | — |
-| Código | — (commitar antes do run) |
+| Executado em | 2026-11-09 |
+| Código | commit `24a9613` (o run partiu de `f4217f6` com alterações pendentes em `src/`, commitadas 2 s depois; ver seção 7) |
 
 ## 1. Motivação
 
@@ -165,10 +165,126 @@ O `run.log` deve mostrar `Device: GPU [...], op determinism on`, `Input domain: 
 
 Duração estimada: o teto é de 3000 épocas (15 folds × 200); o E012 somou 2119. Na CPU do notebook, o modelo levou 0,46 s/época com 1260 × 40 × 16 (dados sintéticos); na GPU não foi medido. Estimativa: ~20–30 min, incluindo ~3–4 min de carregamento dos dados.
 
+**Execução real (2026-11-09), no notebook do autor (WSL2, GTX 1650):**
+- Código: o `run.log` registra `f4217f6 (WARNING: uncommitted changes in src/)`. O run começou às 19:50:56 e o commit `24a9613` (código do log-PSD em `src/autoencoders_pipeline.py`, `src/test_autoencoders.py`, `src/check_residual_spectrum.py`) foi feito às 19:50:58. O código executado é, muito provavelmente, o de `24a9613`, mas isso não pode ser conferido pelo log.
+- `Device: GPU ['/physical_device:GPU:0'], op determinism on`; `Input domain: psd (nperseg=512, band=(1.0, 20.5))`; `Input: log10 PSD (Welch, nperseg=512, 1-20.5 Hz, 40 frequencies)`; entrada `(40, 16)`; hiperparâmetros com `kernel=5, first_kernel=5`.
+- Run completo, sem erros; gráfico e diagnóstico do resíduo gerados normalmente.
+- Duração: de 19:50:56 a ~20:57, **~66 min** (previsão: 20–30 min). Carregamento e montagem da matriz: ~3,5 min. Treino: 1,04 h, 1,29 s/época em média (mediana 1,15 s sem a primeira época de cada fold; E012: 1,14 s). A entrada 46× menor não deixou a época mais rápida na GPU: o tempo por passo (~32 ms, 36 passos) não depende do tamanho da entrada nesta faixa.
+- Épocas por fold: 200, 151, 169, 200, 200, 200, 200, 200, 200, 200, 180, 200, 200, 200, 200 (2900 no total, contra 2119 no E012). **O early stopping parou só 3 dos 15 folds** (2, 3 e 11); os outros 12 chegaram ao teto de 200 épocas.
+
 ## 8. Resultados
+
+A referência numérica é o E012. Medidas com unidade (MSE, `val_loss`, MSE por faixa) estão em unidades do log-PSD padronizado e não são comparáveis com as do E012.
+
+### 8.1 Critérios só com saudáveis
+
+| Critério | E012 (tempo, GPU) | Previsão | E014 | Resultado |
+|---|---|---|---|---|
+| Razão p95 ÷ mediana do erro dos saudáveis de treino (mediana entre folds; critério) | 1,568 (1,499–1,689) | ≤ 1,589 | **2,078 (1,946–2,243)** | Refutada; critério falha |
+| Mediana, entre folds, do MSE médio dos saudáveis de treino | 0,00324 (outra unidade) | Só reporte | 0,00331 (0,00322–0,00384) | — |
+| η² do erro dos saudáveis: velocidade / peso / módulo / irregularidade | 0,043 / 0,125 / 0,089 / 0,173 | Sem previsão de direção | **0,566** / 0,059 / 0,046 / 0,066 | — |
+| Erro do peso 0,90 ÷ outros pesos (mediana entre folds) | 1,28 (1,23–1,43) | Acima de 1 | 1,47 (1,36–1,79) | Confirmada (e maior que no E012) |
+| Grupo irregularidade 2 × módulo 0,975 acima do limiar no treino, por fold | 14 | ~14 | 14 (todas as passagens do grupo em todos os folds) | Confirmada |
+| Canais ativos no latente | 3 de 4 nos folds 1 e 4 | Sem previsão | 4 de 4 em todos os folds | — |
+| Folds parados pelo early stopping | 15 de 15 | Maioria | **3 de 15** | Refutada |
+
+Outras medidas, mediana dos 15 folds: zeros no latente 40,8% (36,1–46,8%; E012: 29,5%); penalidade L1 ÷ MSE 0,106 (0,097–0,115; E012: 0,38, outra unidade); melhor `val_loss` 0,0042 (0,0037–0,0049).
+
+**O treino não convergiu em 200 épocas.** Nos 12 folds que chegaram ao teto, a melhor época foi entre a 186ª e a 198ª, e o `val_loss` caiu de 7% a 13% nas últimas 50 épocas (mediana ~11%).
+
+**Erro dos saudáveis de treino por velocidade** (mediana ÷ mediana geral): 45 km/h 1,47; 50 km/h 1,02; 55 km/h 0,47. O erro a 45 km/h é ~3× o erro a 55 km/h (E012: 1,07 / 0,95 / 0,99). Diagnóstico só com saudáveis de treino, irregularidade 1, mediana entre folds:
+
+| Razão p95 ÷ mediana | Todas as velocidades | Só 45 | Só 50 | Só 55 | Sem o nível de cada velocidade¹ |
+|---|---|---|---|---|---|
+| E012 | 1,527 | 1,578 | 1,358 | 1,302 | 1,438 |
+| E014 | 1,999 | 1,536 | 1,766 | 1,698 | 1,661 |
+
+¹ Erro dividido pela média geométrica do erro da sua velocidade, no fold.
+
+A diferença de nível entre velocidades explica parte do alargamento (1,999 → 1,661), mas a distribuição continua mais larga que a do E012 mesmo dentro de cada velocidade de 50 e 55 km/h.
+
+**MSE por faixa** (log-PSD padronizado, mediana dos 15 folds). As faixas seguem `RESIDUAL_BANDS`; a de 0–1 Hz contém só a frequência de 1,0 Hz e a de 20–32 Hz, só a de 20,5 Hz:
+
+| Faixa (Hz) | 0–1 | 1–4 | 4–8 | 8–12 | 12–16 | 16–20 | 20–32 |
+|---|---|---|---|---|---|---|---|
+| MSE | 0,0009 | 0,0015 | 0,0019 | 0,0040 | 0,0038 | 0,0052 | 0,0044 |
+
+O erro cresce com a frequência: 16–20 Hz tem ~3,5× o erro de 1–4 Hz.
+
+Composição acima do limiar no treino, por fold (grupo das 15 / peso 0,90 / outros): 14 / 27,0 / 22,0 (E012: 14 / 40,8 / 8,2). Por velocidade, média por fold: 45 km/h 48,5; 50 km/h 9,8; 55 km/h 4,7.
+
+### 8.2 Métricas globais
+
+| Métrica | E012 (GPU) | E014 |
+|---|---|---|
+| Acurácia | 0,6256 ± 0,0219 | 0,6090 ± 0,0212 |
+| Recall | 0,3226 ± 0,1029 | 0,3211 ± 0,0921 |
+| FPR | 0,0815 (110) | 0,1126 (152) |
+| AUC agregada | 0,6657 | 0,6364 |
+| Matriz de confusão | TN 1240 · FP 110 · FN 884 · TP 421 | TN 1198 · FP 152 · FN 886 · TP 419 |
+
+### 8.3 Por severidade
+
+| Severidade | n | Recall E012 | Recall E014 | AUC E012 | AUC E014 | FN E012 | FN E014 | Erro mediano danificado ÷ saudável² (E012 / E014) |
+|---|---|---|---|---|---|---|---|---|
+| 0,01 | 225 | 0,044 | 0,080 | 0,469 | 0,478 ± 0,035 | 215 | 207 | 0,99 / 0,97 |
+| 0,05 | 225 | 0,067 | 0,089 | 0,493 | 0,495 ± 0,031 | 210 | 205 | 0,99 / 0,99 |
+| 0,10 | 225 | 0,067 | 0,102 | 0,603 | 0,515 ± 0,026 | 210 | 202 | 1,06 / 1,02 |
+| 0,20 | 225 | 0,253 | 0,200 | 0,750 | 0,609 ± 0,047 | 168 | 180 | 1,23 / 1,15 |
+| 0,50 | 225 | 0,640 | 0,591 | 0,854 | 0,824 ± 0,030 | 81 | 92 | 3,85 / 1,96 |
+| 1,00 | 180 | 1,000 | 1,000 | 0,998 | 0,994 ± 0,009 | 0 | 0 | 26,9 / 14,0 |
+
+² Mediana, entre folds, da razão entre o erro mediano dos danificados da severidade e o dos saudáveis de teste do fold. Recalculada para o E012 com a mesma conta (o E013 registrou 3,87 e 27,0 para o E012; a diferença vem da forma de agregar).
+
+**Por velocidade** (avaliação, só reporte):
+
+| | 45 km/h | 50 km/h | 55 km/h |
+|---|---|---|---|
+| FPR E012 / E014 | 18,4% / 26,2% | 3,8% / 6,2% | 2,2% / 1,3% |
+| Recall sev. 0,2, E012 / E014 | 32,0% / 40,0% | 17,3% / 18,7% | 26,7% / **1,3%** |
+| Recall sev. 0,5, E012 / E014 | 68,0% / 80,0% | 61,3% / 54,7% | 62,7% / 42,7% |
+| FN E012 / E014 | 264 / 232 | 314 / 312 | 306 / 342 |
+
+FPR por peso de vagão do fold: 0,90 (folds 10–12) 7,8%–40%; demais pesos 0%–14,4% (o máximo é o fold 4, peso 1,05 × módulo 0,975). Os folds 10–12 têm 78 dos 152 falsos positivos. O grupo irregularidade 2 × módulo 0,975 gerou os mesmos 15. FPR na irregularidade 1: 10,3% (E012: 7,2%).
+
+### 8.4 Distribuição dos erros
+
+![Distribuição do erro por severidade](error_distribution.png)
 
 ## 9. Análise
 
+**Hipótese (seção 2): refutada.** A distribuição do erro dos saudáveis de treino ficou bem mais larga que no E012 (razão p95 ÷ mediana 1,568 → 2,078, em todos os 15 folds acima de 1,94). A diferença é ~24 vezes a margem de variação de execução (0,021), que foi medida no domínio do tempo, então a conclusão não depende dessa margem. O argumento da hipótese era que uma entrada quase toda determinada pelas condições operacionais deixaria uma variação mais regular para o modelo reproduzir. Ela deixou, mas o erro passou a depender da condição operacional: a velocidade explica 57% da variação do erro dos saudáveis (E012: 4%).
+
+**De onde vem o alargamento.** Duas partes, medidas só com saudáveis (seção 8.1):
+- **Nível por velocidade.** O modelo reconstrói o espectro de 45 km/h com ~3× o erro do de 55 km/h. Como o limiar é um único percentil por fold, as passagens a 45 km/h ocupam ~49 dos ~63 lugares acima dele. Tirar o nível de cada velocidade reduz a razão de 2,00 para 1,66.
+- **Largura dentro da velocidade.** Mesmo assim, a 50 e 55 km/h a razão (1,77 e 1,70) é maior que no E012 (1,36 e 1,30).
+
+Por que o espectro a 45 km/h é mais difícil de reconstruir não foi verificado. Uma possibilidade é a velocidade mudar a forma do espectro (os picos principais trocam de posição e de ordem entre velocidades, seção 1, ponto 3), e o modelo pequeno (16.872 parâmetros, latente de 40 valores) representar melhor algumas formas que outras. Outra é o próprio treino: ver o próximo parágrafo.
+
+**O treino não terminou.** O early stopping parou só 3 dos 15 folds, e o `val_loss` ainda caía ~11% nas últimas 50 épocas. O número de épocas foi herdado do domínio do tempo (seção 5) e não se mostrou suficiente para este modelo. Não se sabe se a razão diminuiria com mais épocas; o MSE ainda caía, mas a razão mede a forma da distribuição, e não o nível. Essa limitação vale para todas as medidas deste run.
+
+**Previsões que se confirmaram.** O peso 0,90 continua acima dos outros (1,47; no E012, 1,28), coerente com ele ser o mais distante no espectro. O grupo irregularidade 2 × módulo 0,975 continua inteiro acima do limiar (14 por fold). Nenhum canal do latente morreu.
+
+**Avaliação (seção 4.2): só reporte.** O resultado se aproxima do segundo cenário (dano continua mascarado):
+- A separação piorou nas severidades em que havia sinal: o erro mediano da severidade 0,5 caiu de 3,85× para 1,96× o dos saudáveis, e a AUC da 0,2, de 0,750 para 0,609 (−0,14, ~11 vezes o ruído de execução de 0,013). A AUC da 0,1 caiu de 0,603 para 0,515.
+- O total de falsos negativos quase não mudou (884 → 886), mas mudou de lugar: caiu a 45 km/h (264 → 232) e subiu a 55 km/h (306 → 342). A 55 km/h, o recall da severidade 0,2 foi de 27% para 1%. O limiar fica alto por causa das passagens de 45 km/h, e o dano nas passagens de 55 km/h, com erro saudável ~3× menor, não chega a ele.
+- O FPR subiu de 8,2% para 11,3%, concentrado a 45 km/h (26%).
+- A severidade 0,01 continuou com AUC ≈ 0,5 (0,478), como previsto. O recall maior nas severidades até 0,1 (8–10%, contra 4–7%) acompanha o FPR maior (11%) e não indica detecção: recall menos FPR continua negativo.
+
+**Folds 10–12 (peso 0,90), diagnóstico de avaliação.** Os saudáveis de teste têm erro 2,10×, 1,16× e 1,51× o dos saudáveis de treino (outros folds: 0,72–1,74×), e o limiar fica a 1,11×, 1,59× e 1,16× a mediana dos saudáveis de teste. Os folds 10 e 12 repetem o padrão dos experimentos no tempo (FPR 40% e 39%, recall menos FPR 0,16 e 0,12, os menores); o fold 11 não.
+
 ## 10. Decisão e próximos passos
+
+- **Critério da seção 4.3: não atendido** (razão 2,078 > 1,589).
+- **Decisão: não adotada.** A base continua sendo a configuração do E010, com o E012 como referência numérica na GPU.
+- **Limite da decisão:** o treino não convergiu em 12 de 15 folds; o critério foi avaliado num modelo ainda em treino.
+- **Variantes avaliadas nos folds de teste até aqui:** 14 (E001–E014).
+
+Opções para o próximo experimento, para o autor escolher (cada uma precisa de registro e aprovação antes do run):
+1. **Mesmo E014 com mais épocas** (por exemplo, teto de 500, mesmo early stopping). Motivação só com saudáveis: 12 de 15 folds no teto e `val_loss` ainda caindo. Responde se a falha do critério vem do treino incompleto. Custo: até ~2,7 h de treino na GPU (15 × 500 × 1,29 s).
+2. **Normalização ou limiar por velocidade** (caminho reservado pelo autor para a variação das condições operacionais). Motivação só com saudáveis: 57% da variação do erro vem da velocidade, e tirar esse nível reduz a razão de 2,00 para 1,66. Supõe que a velocidade é medida em operação.
+3. **Voltar à entrada no tempo** e encerrar o eixo da representação, se o autor considerar que a perda de separação já basta para descartar a PSD.
+
+Recomendação: a opção 1, porque é a única que separa o efeito da representação do efeito do treino incompleto; sem ela, a conclusão sobre a PSD fica em aberto.
 
 ## Notas posteriores
