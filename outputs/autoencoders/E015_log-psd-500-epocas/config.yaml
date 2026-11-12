@@ -1,0 +1,37 @@
+pipeline:
+  # Passa-banda 1-20 Hz: mantém a banda modal (picos de 4-15.5 Hz) e remove a
+  # faixa de 64-128 Hz, que o autoencoder não reconstrói e dominava o erro.
+  filter_type: "both"
+  cutoff_low: 1
+  cutoff_high: 20
+  sampling_frequency: 256
+  axes_to_use: ["X", "Y"]
+  nodes_to_use: [10654, 10659, 10664, 10669, 10658, 10663, 10668, 10673]
+  fold_strategy: "predefined"
+  n_splits: 15
+
+model:
+  # Entrada: log10 da PSD (Welch) de cada canal, 1,0-20,5 Hz (40 frequências, 0,5 Hz),
+  # calculada sobre o mesmo trecho de 1824 amostras dos experimentos no tempo.
+  input_domain: "psd"
+  psd_nperseg: 512
+  psd_band: [1.0, 20.5]
+  # Encoder: um bloco Conv1D + MaxPooling1D por item; o decoder é o espelho.
+  # Com PSD, os pools reduzem o eixo da frequência: 40 -> 20 -> 10 (latente 10 x 4 = 40 valores).
+  encoder_filters: [32, 32, 4]
+  pool_sizes: [2, 2, 1]
+  # 5 frequências (2,5 Hz): largura de um pico na PSD com nperseg 512.
+  kernel_size: 5
+  # Coeficiente L1 de atividade sobre o espaço latente (esparsidade).
+  l1_activity: 1.0e-5
+  learning_rate: 1.0e-3
+  # Teto de 500 épocas: no E014, 12 de 15 folds chegaram ao teto de 200 com o val_loss ainda caindo.
+  epochs: 500
+  batch_size: 32
+  validation_split: 0.1
+  early_stopping_patience: 10
+  # Limiar = percentil 95 do erro de reconstrução dos saudáveis de treino.
+  # threshold_k só é usado pela regra "mean_std".
+  threshold_rule: "percentile"
+  threshold_percentile: 95
+  threshold_k: 1.0
