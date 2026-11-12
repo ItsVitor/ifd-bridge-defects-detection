@@ -189,7 +189,8 @@ def print_error_report(test_df: pd.DataFrame, train_df: pd.DataFrame, experiment
             "train_healthy": train_df.loc[train_df["fold"] == fold, "error"].mean(),
             "test_healthy": g.loc[g["Class"] == 0, "error"].mean(),
             "test_damaged": g.loc[g["Class"] == 1, "error"].mean(),
-            "threshold": g["threshold"].iloc[0],
+            # Vazio quando o fold tem mais de um limiar (limiar por grupo, ver rethreshold.py).
+            "threshold": g["threshold"].iloc[0] if g["threshold"].nunique() == 1 else np.nan,
             "auc": roc_auc_score(g["Class"], g["error"]),
         })
     print("\nPer fold (mean reconstruction error and within-fold AUC):")

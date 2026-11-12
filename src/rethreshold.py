@@ -21,7 +21,7 @@ import yaml
 from autoencoders_pipeline import compute_threshold
 from test_autoencoders import git_revision, print_error_report
 
-THRESHOLD_KEYS = {"threshold_rule", "threshold_k", "threshold_percentile"}
+THRESHOLD_KEYS = {"threshold_rule", "threshold_k", "threshold_percentile", "threshold_group"}
 
 
 def load_config(experiment_dir: str) -> dict:
@@ -82,11 +82,22 @@ if __name__ == "__main__":
     rule = model_cfg.get("threshold_rule", "mean_std")
     k, percentile = model_cfg["threshold_k"], model_cfg.get("threshold_percentile")
 
+    # threshold_group (opcional): coluna de metadado (ex.: "Velocidade") que separa os
+    # saudáveis de treino de cada fold; cada grupo recebe o próprio limiar, e cada passagem
+    # de teste usa o limiar do seu grupo. Supõe que o metadado é medido em operação.
+    group = model_cfg.get("threshold_group")
+    keys = ["fold"] + ([group] if group else [])
+
     test_df = pd.read_parquet(os.path.join(args.parent_dir, "test_errors.parquet"))
     train_df = pd.read_parquet(os.path.join(args.parent_dir, "train_errors.parquet"))
-    thresholds = {fold: compute_threshold(g["error"].to_numpy(), rule, k, percentile)
-                  for fold, g in train_df.groupby("fold")}
-    test_df["threshold"] = test_df["fold"].map(thresholds)
+    thresholds = (
+        train_df.groupby(keys)["error"]
+        .agg(lambda e: compute_threshold(e.to_numpy(), rule, k, percentile))
+        .rename("threshold").reset_index()
+    )
+    test_df = test_df.drop(columns="threshold").merge(thresholds, on=keys, how="left", validate="many_to_one")
+    if test_df["threshold"].isna().any():
+        raise ValueError("Some test groups have no healthy training samples to set a threshold.")
     test_df.to_parquet(os.path.join(args.experiment_dir, "test_errors.parquet"))
     train_df.to_parquet(os.path.join(args.experiment_dir, "train_errors.parquet"))
 
@@ -96,10 +107,13 @@ if __name__ == "__main__":
     print(f"\nExperiment: {args.experiment_dir}")
     print(f"Reconstruction errors from: {args.parent_dir}")
     print(f"Code revision: {git_revision()}")
-    print(f"Threshold rule: {rule}, threshold_k={k}, threshold_percentile={percentile}")
-    for fold, thr in thresholds.items():
-        above = float((train_df.loc[train_df["fold"] == fold, "error"] > thr).mean())
-        print(f"  Fold {fold:2d}: threshold={thr:.4f}  healthy train above: {above:.3f}")
+    print(f"Threshold rule: {rule}, threshold_k={k}, threshold_percentile={percentile}, threshold_group={group}")
+    merged = train_df.merge(thresholds, on=keys)
+    summary = (merged.assign(above=merged["error"] > merged["threshold"])
+               .groupby(keys).agg(threshold=("threshold", "first"), above=("above", "mean")).reset_index())
+    for row in summary.to_dict("records"):
+        print(f"  {', '.join(f'{c}={row[c]:g}' for c in keys)}: threshold={row['threshold']:.4f}  "
+              f"healthy train above: {row['above']:.3f}")
 
     accuracies, recalls = fold_metrics(test_df)
     y_true = test_df["Class"].to_numpy()
