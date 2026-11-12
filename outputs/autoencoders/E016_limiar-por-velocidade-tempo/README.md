@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Status | Proposto |
+| Status | Concluído (critério atendido; adoção pendente de decisão do autor) |
 | Pai (base de comparação) | [E012](../E012_e010-na-gpu/README.md) (configuração do E010, na GPU) |
 | Proposto em | 2026-11-12 |
-| Executado em | — |
-| Código | — (commitar antes do run) |
+| Executado em | 2026-11-12 |
+| Código | commit `a0a4688` |
 
 ## 1. Motivação
 
@@ -129,11 +129,101 @@ Commitar o código e esta pasta antes. No PowerShell, em menos de um minuto (nã
 
 O `run.log` deve mostrar `threshold_group=Velocidade` e 45 linhas de limiar (15 folds × 3 velocidades), cada uma com `healthy train above: 0.050`.
 
+**Execução real (2026-11-12):** `Code revision: a0a4688`, sem aviso de alterações pendentes; esse commit contém as mudanças em `src/rethreshold.py` e `src/test_autoencoders.py`. `threshold_group=Velocidade` e 45 linhas de limiar, todas com `healthy train above: 0.050`. Menos de um minuto, sem erros. Os parquets desta pasta têm os mesmos erros do E012 (conferido passagem a passagem), com a coluna `threshold` recalculada. O aviso do TensorFlow no início do `run.log` (oneDNN) vem só da importação e não afeta o resultado.
+
 ## 8. Resultados
+
+### 8.1 Critérios só com saudáveis
+
+| Critério | E012 | Previsão (calculada) | E016 | Resultado |
+|---|---|---|---|---|
+| Saudáveis de treino acima do limiar, por velocidade | 11,7% / 1,6% / 1,7% | 5,0% em cada | 5,0% em cada uma das 45 combinações fold × velocidade | Confirmada (critério atendido) |
+| Irregularidade 1 acima do limiar, por velocidade | 10,9% / 0,6% / 0,6% | 4,0% em cada | 4,0% em cada | Confirmada |
+| Limiar por velocidade ÷ limiar único (mediana) | 1 | 1,09 / 0,85 / 0,85 | 1,09 / 0,85 / 0,85 | Confirmada |
+| Acima do limiar no treino, por fold (grupo das 15 / peso 0,90 / outros) | 14 / 40,8 / 8,2 | 14 / 34,3 / 14,7 | 14 / 34,3 / 14,7 | Confirmada |
+
+Limiares por velocidade (faixa entre folds): 45 km/h 0,0042–0,0062; 50 km/h 0,0031–0,0048; 55 km/h 0,0032–0,0046.
+
+### 8.2 Métricas globais
+
+| Métrica | E012 | E016 | Δ |
+|---|---|---|---|
+| Acurácia | 0,6256 ± 0,0219 | 0,6271 ± 0,0376 | +0,0015 |
+| Recall | 0,3226 ± 0,1029 | 0,3724 ± 0,1501 | +0,0498 |
+| FPR | 0,0815 (110) | 0,1267 (171) | +0,0452 |
+| AUC agregada (erro bruto) | 0,6657 | 0,6657 | 0 (por construção) |
+| AUC agregada do erro ÷ limiar da passagem | 0,6684 | 0,6648 | −0,0036 |
+| Matriz de confusão | TN 1240 · FP 110 · FN 884 · TP 421 | TN 1179 · FP 171 · FN 819 · TP 486 | FN −65 |
+
+250 das 2655 decisões de teste mudaram (125 saudáveis, 125 danificados): 188 alarmes novos e 62 retirados.
+
+### 8.3 Por severidade
+
+| Severidade | n | Recall E012 | Recall E016 | Recall − FPR E012 | Recall − FPR E016 | FN E012 | FN E016 | AUC do erro bruto | AUC do erro ÷ limiar (E012 / E016) |
+|---|---|---|---|---|---|---|---|---|---|
+| 0,01 | 225 | 0,044 | 0,071 | −0,037 | −0,056 | 215 | 209 | 0,469 | 0,469 / 0,447 |
+| 0,05 | 225 | 0,067 | 0,120 | −0,015 | −0,007 | 210 | 198 | 0,493 | 0,493 / 0,486 |
+| 0,10 | 225 | 0,067 | 0,133 | −0,015 | +0,007 | 210 | 195 | 0,603 | 0,603 / 0,590 |
+| 0,20 | 225 | 0,253 | 0,382 | +0,172 | +0,256 | 168 | 139 | 0,750 | 0,750 / 0,745 |
+| 0,50 | 225 | 0,640 | 0,653 | +0,559 | +0,527 | 81 | 78 | 0,854 | 0,854 / 0,844 |
+| 1,00 | 180 | 1,000 | 1,000 | +0,919 | +0,873 | 0 | 0 | 0,998 | 0,997 / 0,997 |
+
+A AUC do erro ÷ limiar é calculada dentro de cada fold (média dos 15), como a do `run.log`. No E012, ela é igual à do erro bruto, porque o limiar é o mesmo para todas as passagens do fold.
+
+**Por velocidade:**
+
+| | 45 km/h | 50 km/h | 55 km/h |
+|---|---|---|---|
+| FPR E012 / E016 | 18,4% / 11,3% | 3,8% / 12,0% | 2,2% / 14,7% |
+| Falsos positivos E012 / E016 | 83 / 51 | 17 / 54 | 10 / 66 |
+| Recall sev. 0,2, E012 / E016 | 32,0% / 18,7% | 17,3% / 49,3% | 26,7% / 46,7% |
+| Recall sev. 0,5, E012 / E016 | 68,0% / 64,0% | 61,3% / 64,0% | 62,7% / 68,0% |
+| FN E012 / E016 | 264 / 294 | 314 / 270 | 306 / 255 |
+
+**Falsos positivos por fold.** Os folds 10–12 (peso 0,90) passaram de 86 para 112 dos 171 (FPR 32% → 42%). O fold 7 (peso 1,10 × módulo 0,975) passou de 4 para 33: as 30 passagens saudáveis de teste a 55 km/h desse fold ficaram todas acima do limiar. Fora dos folds 10–12 e do grupo irregularidade 2 × módulo 0,975, o FPR foi de 1,1% para 4,4%. O grupo gerou os mesmos 15 falsos positivos. FPR na irregularidade 1: 7,2% → 11,8%.
+
+Erro mediano dos saudáveis de teste ÷ erro mediano dos saudáveis de treino da mesma velocidade, no fold:
+
+| Fold | 45 km/h | 50 km/h | 55 km/h |
+|---|---|---|---|
+| 7 (1,10 × 0,975) | 1,16 | 1,17 | 1,41 |
+| 10 (0,90 × 0,975) | 1,79 | 1,55 | 1,31 |
+| 12 (0,90 × 1,025) | 1,64 | 1,46 | 1,28 |
+| Mediana dos outros 11 folds | 1,02 | 1,00 | 0,97 |
+
+### 8.4 Distribuição dos erros
+
+O gráfico usa o erro ÷ limiar de cada passagem, ou seja, o limiar da sua velocidade.
+
+![Distribuição do erro por severidade](error_distribution.png)
 
 ## 9. Análise
 
+**Hipótese (seção 2): confirmada, por construção.** 5,0% dos saudáveis de treino ficaram acima do limiar em cada velocidade de cada fold. As previsões calculadas da seção 4.1 se confirmaram exatamente, como esperado: elas usam só os saudáveis de treino, que não mudam.
+
+**Previsões de avaliação (seção 4.2):**
+- AUC do erro bruto idêntica à do E012: confirmada.
+- FPR por velocidade caindo a 45 km/h e subindo a 50 e 55 km/h, aproximando as três: confirmada (11,3% / 12,0% / 14,7%, contra 18,4% / 3,8% / 2,2%).
+- FPR total perto do E012: **refutada** (8,2% → 12,7%). Ver abaixo.
+- FN subindo a 45 km/h e caindo a 50 e 55 km/h: confirmada (264 → 294; 314 → 270; 306 → 255).
+- Severidades até 0,05 com recall perto do FPR: confirmada.
+
+**Por que o FPR total subiu, se o α de treino continuou 5% por fold.** O limiar único deixava 50 e 55 km/h com α ≈ 0,6% no treino. Essa folga absorvia a diferença entre treino e teste nos folds cuja combinação de peso × módulo fica na borda da grade (folds 7, 10 e 12): neles, os saudáveis de teste têm erro 1,3–1,8 vez o dos saudáveis de treino da mesma velocidade (nos outros folds, ~1,0). Com o limiar por velocidade, a folga a 50 e 55 km/h acabou, e esses folds passaram a gerar alarmes falsos nessas velocidades também. No fold 7, todos os 30 saudáveis de teste a 55 km/h ficaram acima do limiar. Nos outros folds, o FPR (4,4% sem o grupo das 15) ficou perto do α escolhido de 5%, o que é o comportamento pretendido; antes era 1,1%.
+
+**De onde veio a queda de falsos negativos.** O total caiu 65 (884 → 819, ~9 vezes o ruído de execução de ~7 medido no E012; entre execuções na GPU o ruído é zero). Quase todo o ganho está na severidade 0,2 a 50 e 55 km/h, em que o recall foi de ~17–27% para ~47–49%, enquanto a 45 km/h ele caiu de 32% para 19%. A AUC do erro ÷ limiar quase não mudou (sev. 0,2: 0,750 → 0,745). Ou seja, o score não separa melhor os danificados; o limiar por velocidade troca alarmes entre velocidades e, no total, alarma mais (FPR +4,5 pontos). A queda de FN vem junto com mais alarmes falsos, e não de detecção melhor.
+
+**O que o resultado mostra sobre o problema.** No domínio do tempo, a velocidade já pesava pouco no erro dos saudáveis (η² 0,043), e o limiar único concentrava os alarmes a 45 km/h. O limiar por velocidade corrige essa concentração, como pretendido, mas expõe o outro problema já conhecido: as combinações de peso × módulo da borda da grade generalizam pior (E005, E013).
+
 ## 10. Decisão e próximos passos
+
+- **Critério da seção 4.3: atendido, por construção** (5% dos saudáveis de treino acima do limiar em cada velocidade de cada fold).
+- **Decisão: pendente do autor.** Como no E005, adotar é uma decisão de projeto. Ela inclui aceitar duas suposições: a velocidade é medida em operação, e, em operação, as velocidades contínuas serão agrupadas em faixas (seção 3, limites). As métricas de teste da seção 8 são reportadas e não entram nessa decisão.
+- Se adotado, a base passa a ser a configuração do E010 com limiar no percentil 95 por velocidade.
+- **Variantes avaliadas nos folds de teste até aqui:** 17 (E001–E017).
+
+Próximos experimentos possíveis, motivados só por saudáveis ou por raciocínio físico (para o autor escolher):
+1. **Limiar por velocidade × peso do vagão** (reserva do autor, com pesagem em movimento). Motivação só com saudáveis: das 63 passagens acima do limiar de treino por fold, 34 continuam sendo de peso 0,90. Supõe o peso medido em operação, o que é mais difícil que a velocidade. Cada limiar seria estimado com 84 passagens (56 para o peso do fold de teste), com ~3–4 acima do percentil 95, o que deixa a estimativa do percentil 95 instável; isso precisa ser avaliado antes, só com saudáveis.
+2. **Generalização nas bordas da grade de condições operacionais.** O problema dos folds 7, 10 e 12 é do modelo, e não do limiar: o erro dos saudáveis sobe quando a combinação de peso × módulo não está no treino. Sem medida só com saudáveis que já aponte uma mudança no modelo para isso; precisaria de uma análise à parte.
 
 ## Notas posteriores
 
